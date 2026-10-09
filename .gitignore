@@ -1,0 +1,8 @@
+/out/
+client/out/
+server/out/
+server/test-out/
+client/package-check/
+server/package-check/
+server/lib/*.jar
+server/.env
