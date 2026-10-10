@@ -71,6 +71,15 @@ public final class PlayerSessionManager {
         }
     }
 
+    public synchronized void updateStatistics(String username, int matchesPlayed, int score,
+                                              int wins, int losses, int draws) {
+        ClientHandler handler = sessions.get(username);
+        if (handler != null) {
+            handler.updateStatistics(matchesPlayed, score, wins, losses, draws);
+            broadcastPlayerList();
+        }
+    }
+
     private List<PlayerSummary> snapshot() {
         List<PlayerSummary> result = new ArrayList<>();
         for (ClientHandler handler : sessions.values()) {

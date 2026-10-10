@@ -4,6 +4,7 @@ import tank.client.controller.ClientController;
 import tank.client.model.PlayerProfile;
 import tank.client.model.PlayerSummary;
 import tank.client.model.RoomState;
+import tank.client.model.GameState;
 import javax.imageio.ImageIO;
 import javax.swing.JButton;
 import javax.swing.JComponent;
@@ -58,8 +59,17 @@ public final class LobbyUiCheck {
                 frame.closeChallenge("challenge-preview", "ACCEPTED");
                 frame.showRoom(new RoomState("12345678-0000-0000-0000-000000000000", "doanngocquang", "player_a", 3));
                 capture((JComponent) frame.getContentPane(), "room", 960, 560);
-                frame.showMatchStarted(false);
+                frame.showMatchStarted(true);
                 capture((JComponent) frame.getContentPane(), "handoff", 960, 560);
+                frame.showGame("12345678-0000-0000-0000-000000000000", "doanngocquang", "player_a");
+                frame.updateGame(new GameState("12345678-0000-0000-0000-000000000000", 179,
+                        new GameState.Tank(400, 100, 49, 1), new GameState.Tank(280, 80, 45, 0),
+                        List.of(new GameState.Bullet("doanngocquang", 400, 220))));
+                capture((JComponent) frame.getContentPane(), "gameplay", 960, 560);
+                frame.showHitEffect("12345678-0000-0000-0000-000000000000", 400, 220);
+                capture((JComponent) frame.getContentPane(), "hit-effect", 960, 560);
+                frame.showGameOver("12345678-0000-0000-0000-000000000000", "doanngocquang", "Đối thủ đã hết HP.");
+                capture((JComponent) frame.getContentPane(), "game-over", 960, 560);
 
                 AtomicInteger accepts = new AtomicInteger(), rejects = new AtomicInteger();
                 dialog = new ChallengeDialog(frame, "doanngocquang", 30, accepts::incrementAndGet, rejects::incrementAndGet);

@@ -39,6 +39,18 @@ public final class JdbcAccountRepository implements AccountRepository {
             ensureColumn(connection, statement, "losses", "INT NOT NULL DEFAULT 0");
             ensureColumn(connection, statement, "draws", "INT NOT NULL DEFAULT 0");
             ensureEmailIndex(connection, statement);
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS matches ("
+                    + "match_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, "
+                    + "started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, ended_at TIMESTAMP NULL, "
+                    + "status VARCHAR(16) NOT NULL DEFAULT 'COMPLETED', winner_username VARCHAR(24) NULL, "
+                    + "loser_username VARCHAR(24) NULL, is_draw BOOLEAN NOT NULL DEFAULT FALSE, "
+                    + "FOREIGN KEY (winner_username) REFERENCES player_accounts(username), "
+                    + "FOREIGN KEY (loser_username) REFERENCES player_accounts(username)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS match_players ("
+                    + "match_id BIGINT NOT NULL, username VARCHAR(24) NOT NULL, score INT NOT NULL DEFAULT 0, "
+                    + "result VARCHAR(8) NOT NULL, PRIMARY KEY (match_id, username), "
+                    + "FOREIGN KEY (match_id) REFERENCES matches(match_id), "
+                    + "FOREIGN KEY (username) REFERENCES player_accounts(username)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         }
     }
 

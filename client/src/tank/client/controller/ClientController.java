@@ -3,6 +3,7 @@ package tank.client.controller;
 import tank.client.model.PlayerSummary;
 import tank.client.model.PlayerProfile;
 import tank.client.model.RoomState;
+import tank.client.model.GameState;
 import tank.client.network.ClientConnection;
 import tank.client.ui.LoginFrame;
 import tank.client.ui.PlayerFrame;
@@ -124,6 +125,11 @@ public final class ClientController implements ClientConnection.Listener {
     public void rejectChallenge(String id) { sendLobbyAction(client -> client.rejectChallenge(id)); }
     public void cancelChallenge(String id) { sendLobbyAction(client -> client.cancelChallenge(id)); }
     public void leaveRoom(String id) { sendLobbyAction(client -> client.leaveRoom(id)); }
+    public void moveLeft() { sendLobbyAction(ClientConnection::moveLeft); }
+    public void moveRight() { sendLobbyAction(ClientConnection::moveRight); }
+    public void shoot() { sendLobbyAction(ClientConnection::shoot); }
+    public void exitGame() { sendLobbyAction(ClientConnection::exitGame); }
+    public void playAgain() { sendLobbyAction(ClientConnection::playAgain); }
 
     private void sendLobbyAction(ConnectionAction action) {
         ClientConnection current = connection;
@@ -204,7 +210,8 @@ public final class ClientController implements ClientConnection.Listener {
 
     @Override public void onMatchStart(String roomId, String player1, String player2) {
         withPlayerFrame(frame -> {
-            frame.showMatchStarted(matchStartHandler != null);
+            frame.showMatchStarted(true);
+            frame.showGame(roomId, player1, player2);
             if (matchStartHandler != null) {
                 try { matchStartHandler.onMatchStart(roomId, player1, player2); }
                 catch (RuntimeException exception) {
@@ -212,6 +219,16 @@ public final class ClientController implements ClientConnection.Listener {
                 }
             }
         });
+    }
+
+    @Override public void onGameState(GameState state) { withPlayerFrame(frame -> frame.updateGame(state)); }
+
+    @Override public void onGameOver(String roomId, String winner, String reason) {
+        withPlayerFrame(frame -> frame.showGameOver(roomId, winner, reason));
+    }
+
+    @Override public void onHitEffect(String roomId, int x, int y) {
+        withPlayerFrame(frame -> frame.showHitEffect(roomId, x, y));
     }
 
     @Override public void onLobbyError(String reason) { withPlayerFrame(frame -> frame.showLobbyError(reason)); }

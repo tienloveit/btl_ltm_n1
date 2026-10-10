@@ -28,6 +28,7 @@ public final class Protocol {
     public static final String SHOOT = "SHOOT";
     public static final String GAME_STATE = "GAME_STATE";
     public static final String GAME_OVER = "GAME_OVER";
+    public static final String HIT_EFFECT = "HIT_EFFECT";
     public static final String PLAY_AGAIN = "PLAY_AGAIN";
     public static final String EXIT = "EXIT";
 

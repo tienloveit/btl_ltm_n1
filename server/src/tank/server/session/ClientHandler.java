@@ -4,6 +4,7 @@ import tank.server.auth.AccountService;
 import tank.server.protocol.Protocol;
 import tank.server.lobby.ChallengeManager;
 import tank.server.room.RoomManager;
+import tank.server.game.GameStateManager;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -24,6 +25,7 @@ public final class ClientHandler implements Runnable {
     private final PlayerSessionManager sessions;
     private final ChallengeManager challenges;
     private final RoomManager rooms;
+    private final GameStateManager games;
     private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(256);
     private Thread writer;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -39,11 +41,17 @@ public final class ClientHandler implements Runnable {
 
     public ClientHandler(Socket socket, AccountService accountService, PlayerSessionManager sessions,
                          ChallengeManager challenges, RoomManager rooms) {
+        this(socket, accountService, sessions, challenges, rooms, null);
+    }
+
+    public ClientHandler(Socket socket, AccountService accountService, PlayerSessionManager sessions,
+                         ChallengeManager challenges, RoomManager rooms, GameStateManager games) {
         this.socket = socket;
         this.accountService = accountService;
         this.sessions = sessions;
         this.challenges = challenges;
         this.rooms = rooms;
+        this.games = games;
     }
 
     @Override
@@ -91,6 +99,16 @@ public final class ClientHandler implements Runnable {
                 } else if (Protocol.ROOM_LEAVE.equals(messageType)) {
                     String id = input.readUTF();
                     if (requireLogin()) { rooms.leave(username, id); }
+                } else if (Protocol.MOVE_LEFT.equals(messageType)) {
+                    if (requireLogin() && games != null) { games.move(username, true); }
+                } else if (Protocol.MOVE_RIGHT.equals(messageType)) {
+                    if (requireLogin() && games != null) { games.move(username, false); }
+                } else if (Protocol.SHOOT.equals(messageType)) {
+                    if (requireLogin() && games != null) { games.shoot(username); }
+                } else if (Protocol.EXIT.equals(messageType)) {
+                    if (requireLogin() && games != null) { games.exit(username); }
+                } else if (Protocol.PLAY_AGAIN.equals(messageType)) {
+                    if (requireLogin() && games != null) { games.playAgain(username); }
                 } else {
                     send(Protocol.SERVER_ERROR, "Message không được hỗ trợ.");
                 }
@@ -248,6 +266,14 @@ public final class ClientHandler implements Runnable {
 
     int getScore() {
         return score;
+    }
+
+    void updateStatistics(int matchesPlayed, int score, int wins, int losses, int draws) {
+        this.matchesPlayed = matchesPlayed;
+        this.score = score;
+        this.wins = wins;
+        this.losses = losses;
+        this.draws = draws;
     }
 
     PlayerStatus getStatus() {

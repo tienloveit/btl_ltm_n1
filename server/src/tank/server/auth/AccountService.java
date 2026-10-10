@@ -72,6 +72,20 @@ public final class AccountService {
             record.wins(), record.losses(), record.draws());
     }
 
+    public Account recordResult(String username, boolean win, boolean draw) throws SQLException {
+        AccountRecord record = repository.findByUsername(username)
+                .orElseThrow(() -> new SQLException("Không tìm thấy tài khoản người chơi."));
+        int score = record.score() + (draw ? 1 : win ? 3 : 0);
+        int wins = record.wins() + (win ? 1 : 0);
+        int losses = record.losses() + (!win && !draw ? 1 : 0);
+        int draws = record.draws() + (draw ? 1 : 0);
+        int played = record.matchesPlayed() + 1;
+        if (!repository.updateStatistics(username, played, score, wins, losses, draws)) {
+            throw new SQLException("Không thể cập nhật thống kê người chơi.");
+        }
+        return new Account(record.username(), record.email(), played, score, wins, losses, draws);
+    }
+
     private static byte[] hash(char[] password, byte[] salt) {
         PBEKeySpec spec = new PBEKeySpec(password, salt, ITERATIONS, KEY_BITS);
         try {

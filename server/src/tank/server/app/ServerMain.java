@@ -7,6 +7,8 @@ import tank.server.session.ClientHandler;
 import tank.server.session.PlayerSessionManager;
 import tank.server.lobby.ChallengeManager;
 import tank.server.room.RoomManager;
+import tank.server.game.GameStateManager;
+import tank.server.persistence.MatchHistoryRepository;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -38,6 +40,9 @@ public final class ServerMain {
         });
         scheduler.setRemoveOnCancelPolicy(true);
         RoomManager rooms = new RoomManager(sessions, scheduler);
+        GameStateManager games = new GameStateManager(sessions, rooms, scheduler, accountService,
+                new MatchHistoryRepository(databaseConfig));
+        rooms.setGameListener(games);
         ChallengeManager challenges = new ChallengeManager(sessions, rooms, scheduler);
         sessions.setDisconnectListener(challenges::onDisconnect);
         ThreadPoolExecutor workers = createWorkerPool();
@@ -48,7 +53,7 @@ public final class ServerMain {
             while (!serverSocket.isClosed()) {
                 Socket socket = serverSocket.accept();
                 try {
-                    workers.execute(new ClientHandler(socket, accountService, sessions, challenges, rooms));
+                    workers.execute(new ClientHandler(socket, accountService, sessions, challenges, rooms, games));
                     System.out.println("Accepted connection from " + socket.getRemoteSocketAddress());
                 } catch (java.util.concurrent.RejectedExecutionException exception) {
                     socket.close();

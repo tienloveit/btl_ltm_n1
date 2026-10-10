@@ -4,6 +4,7 @@ import tank.client.controller.ClientController;
 import tank.client.model.PlayerProfile;
 import tank.client.model.PlayerSummary;
 import tank.client.model.RoomState;
+import tank.client.model.GameState;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -21,6 +22,7 @@ public final class PlayerFrame extends JFrame {
     private final ClientController controller;
     private final OnlinePlayersPanel onlinePlayers;
     private final WaitingRoomPanel waitingRoom;
+    private final GamePlayPanel gamePlay;
     private final CardLayout cards = new CardLayout();
     private final JPanel content = new JPanel(cards);
     private final JLabel message = new JLabel("Chọn đối thủ đang chờ để thách đấu.");
@@ -42,6 +44,8 @@ public final class PlayerFrame extends JFrame {
         waitingRoom = new WaitingRoomPanel(() -> {
             if (roomId != null) { controller.leaveRoom(roomId); }
         });
+        gamePlay = new GamePlayPanel(profile.getUsername(), controller::moveLeft, controller::moveRight,
+                controller::shoot, controller::playAgain, controller::exitGame);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setSize(1000, 620);
         setMinimumSize(new Dimension(900, 540));
@@ -83,6 +87,7 @@ public final class PlayerFrame extends JFrame {
         content.setOpaque(false);
         content.add(onlinePlayers, "lobby");
         content.add(waitingRoom, "room");
+        content.add(gamePlay, "game");
         root.add(content, BorderLayout.CENTER);
         JPanel footer = new JPanel(new BorderLayout(16, 0));
         footer.setOpaque(false);
@@ -195,6 +200,25 @@ public final class PlayerFrame extends JFrame {
     public void showMatchStarted(boolean integrated) {
         waitingRoom.showStarted(integrated);
         showMessage(integrated ? "Trận đấu đã bắt đầu." : "Trận đấu đã bắt đầu; gameplay chưa được tích hợp.", false);
+    }
+
+    public void showGame(String id, String player1, String player2) {
+        roomId = id;
+        gamePlay.start(id, player1, player2);
+        cards.show(content, "game");
+        gamePlay.requestFocusInWindow();
+    }
+
+    public void updateGame(GameState state) {
+        if (state.roomId().equals(roomId)) { gamePlay.setState(state); }
+    }
+
+    public void showGameOver(String id, String winner, String reason) {
+        if (id.equals(roomId)) { gamePlay.gameOver(winner, reason); }
+    }
+
+    public void showHitEffect(String id, int x, int y) {
+        if (id.equals(roomId)) { gamePlay.showImpact(x, y); }
     }
 
     public void closeRoom(String id, String reason) {
