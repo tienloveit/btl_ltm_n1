@@ -21,7 +21,13 @@ public final class ClientApp {
             System.err.println("Server port must be between 1 and 65535.");
             return;
         }
-        SwingUtilities.invokeLater(() -> new ClientController(host, port).showLogin());
+        SwingUtilities.invokeLater(() -> {
+            ClientController controller = new ClientController(host, port);
+            controller.setNavigationHandlers(
+                    controller::requestRanking,
+                    controller::requestHistory);
+            controller.showLogin();
+        });
     }
 
     private static String environmentOrDefault(String name, String defaultValue) {

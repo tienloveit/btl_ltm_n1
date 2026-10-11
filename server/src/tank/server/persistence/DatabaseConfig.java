@@ -13,7 +13,7 @@ import java.util.Map;
 
 public final class DatabaseConfig {
     private static final String DEFAULT_URL =
-            "jdbc:mysql://127.0.0.1:3306/tank_game?allowPublicKeyRetrieval=true&serverTimezone=UTC";
+            "jdbc:mysql://127.0.0.1:3306/tank_game?allowPublicKeyRetrieval=true&serverTimezone=Asia%2FHo_Chi_Minh";
 
     private final String jdbcUrl;
     private final String username;

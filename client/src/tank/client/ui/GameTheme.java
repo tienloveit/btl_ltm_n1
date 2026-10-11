@@ -2,7 +2,9 @@ package tank.client.ui;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTable;
 import javax.swing.text.JTextComponent;
 import java.awt.Color;
 import java.awt.GradientPaint;
@@ -59,6 +61,37 @@ final class GameTheme {
 
     static void styleWindow(javax.swing.JFrame frame) {
         frame.getRootPane().setBorder(BorderFactory.createLineBorder(BORDER));
+    }
+
+    static void styleTable(JTable table) {
+        table.setBackground(SURFACE);
+        table.setForeground(TEXT);
+        table.setFont(table.getFont().deriveFont(13f));
+        table.setGridColor(BORDER);
+        table.setRowHeight(32);
+        table.setSelectionBackground(SURFACE_LIGHT);
+        table.setSelectionForeground(ACCENT);
+        table.setShowHorizontalLines(true);
+        table.setShowVerticalLines(false);
+
+        // Center-align all cell content
+        javax.swing.table.DefaultTableCellRenderer centerRenderer =
+                new javax.swing.table.DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        centerRenderer.setBackground(SURFACE);
+        centerRenderer.setForeground(TEXT);
+        for (int i = 0; i < table.getColumnCount(); i++) {
+            table.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+        }
+
+        javax.swing.table.JTableHeader header = table.getTableHeader();
+        header.setBackground(new Color(15, 25, 33));
+        header.setForeground(ACCENT);
+        header.setFont(header.getFont().deriveFont(java.awt.Font.BOLD, 12f));
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
+        // Center-align header labels
+        ((javax.swing.table.DefaultTableCellRenderer) header.getDefaultRenderer())
+                .setHorizontalAlignment(JLabel.CENTER);
     }
 
     private static final class BackgroundPanel extends JPanel {

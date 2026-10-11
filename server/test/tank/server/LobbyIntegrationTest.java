@@ -521,5 +521,15 @@ public final class LobbyIntegrationTest {
             return records.computeIfPresent(name, (key, old) -> new AccountRecord(name, old.email(), old.passwordSalt(),
                     old.passwordHash(), played, score, wins, losses, draws)) != null;
         }
+
+        @Override
+        public java.util.List<tank.server.persistence.RankingRecord> listRanking(int limit) {
+            return records.values().stream()
+                    .map(a -> new tank.server.persistence.RankingRecord(
+                            a.username(), a.matchesPlayed(), a.score(), a.wins(), a.losses(), a.draws()))
+                    .sorted(java.util.Comparator.comparingInt(tank.server.persistence.RankingRecord::score).reversed())
+                    .limit(limit)
+                    .toList();
+        }
     }
 }

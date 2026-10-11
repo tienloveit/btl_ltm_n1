@@ -1,8 +1,10 @@
 package tank.client.ui;
 
 import tank.client.controller.ClientController;
+import tank.client.model.MatchHistoryEntry;
 import tank.client.model.PlayerProfile;
 import tank.client.model.PlayerSummary;
+import tank.client.model.RankingEntry;
 import tank.client.model.RoomState;
 import tank.client.model.GameState;
 import javax.swing.BorderFactory;
@@ -11,6 +13,9 @@ import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
 import java.awt.Dimension;
@@ -31,10 +36,18 @@ public final class PlayerFrame extends JFrame {
     private final JButton lobby = GameTheme.button("Lobby", true);
     private final JButton ranking = GameTheme.button("Xếp hạng", false);
     private final JButton history = GameTheme.button("Lịch sử đấu", false);
+    // Track pending requests to show loading state and re-enable on response/error
+    private boolean rankingPending = false;
+    private boolean historyPending = false;
     private PlayerProfile profile;
     private String challengeId;
     private String roomId;
     private ChallengeDialog challengeDialog;
+    // Header stat labels kept for live update after each match
+    private final JLabel scoreLabel = new JLabel();
+    private final JLabel winsLabel = new JLabel();
+    private final JLabel lossesLabel = new JLabel();
+    private final JLabel drawsLabel = new JLabel();
 
     public PlayerFrame(ClientController controller, PlayerProfile profile) {
         super("Tank Arena - Lobby");
@@ -62,10 +75,10 @@ public final class PlayerFrame extends JFrame {
         name.setToolTipText("Xem thông tin người chơi");
         name.addActionListener(event -> showProfile());
         header.add(name);
-        header.add(stat("Điểm", profile.getScore()));
-        header.add(stat("Thắng", profile.getWins()));
-        header.add(stat("Thua", profile.getLosses()));
-        header.add(stat("Hòa", profile.getDraws()));
+        header.add(stat("Điểm", profile.getScore(), scoreLabel));
+        header.add(stat("Thắng", profile.getWins(), winsLabel));
+        header.add(stat("Thua", profile.getLosses(), lossesLabel));
+        header.add(stat("Hòa", profile.getDraws(), drawsLabel));
         root.add(header, BorderLayout.NORTH);
 
         JPanel sidebar = GameTheme.card(new BorderLayout(0, 20));
@@ -114,12 +127,12 @@ public final class PlayerFrame extends JFrame {
         });
     }
 
-    private static JPanel stat(String caption, int value) {
+    private static JPanel stat(String caption, int value, JLabel number) {
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setOpaque(false);
         JLabel title = new JLabel(caption);
         title.setForeground(GameTheme.MUTED);
-        JLabel number = new JLabel(Integer.toString(value));
+        number.setText(Integer.toString(value));
         number.setForeground(GameTheme.TEXT);
         number.setFont(number.getFont().deriveFont(Font.BOLD, 23f));
         panel.add(title, BorderLayout.NORTH);
@@ -140,8 +153,22 @@ public final class PlayerFrame extends JFrame {
     }
 
     public void setNavigationHandlers(Runnable onRanking, Runnable onHistory) {
-        configureNavigation(ranking, onRanking);
-        configureNavigation(history, onHistory);
+        configureNavigation(ranking, onRanking == null ? null : () -> {
+            if (!rankingPending) {
+                rankingPending = true;
+                ranking.setEnabled(false);
+                ranking.setText("Đang tải…");
+                onRanking.run();
+            }
+        });
+        configureNavigation(history, onHistory == null ? null : () -> {
+            if (!historyPending) {
+                historyPending = true;
+                history.setEnabled(false);
+                history.setText("Đang tải…");
+                onHistory.run();
+            }
+        });
     }
 
     private static void configureNavigation(JButton button, Runnable action) {
@@ -254,6 +281,17 @@ public final class PlayerFrame extends JFrame {
         if (challengeDialog != null) {
             challengeDialog.setBusy(false);
         }
+        // Re-enable ranking/history buttons if a pending request failed
+        if (rankingPending) {
+            rankingPending = false;
+            ranking.setEnabled(true);
+            ranking.setText("Xếp hạng");
+        }
+        if (historyPending) {
+            historyPending = false;
+            history.setEnabled(true);
+            history.setText("Lịch sử đấu");
+        }
         showMessage(reason, true);
     }
 
@@ -268,6 +306,96 @@ public final class PlayerFrame extends JFrame {
             challengeDialog.dispose();
             challengeDialog = null;
         }
+    }
+
+    /** Called after each match to refresh the header stat counters. */
+    public void updateProfile(PlayerProfile updated) {
+        this.profile = updated;
+        scoreLabel.setText(Integer.toString(updated.getScore()));
+        winsLabel.setText(Integer.toString(updated.getWins()));
+        lossesLabel.setText(Integer.toString(updated.getLosses()));
+        drawsLabel.setText(Integer.toString(updated.getDraws()));
+    }
+
+    /** Displays the ranking table in a dialog. */
+    public void showRanking(List<RankingEntry> entries) {
+        rankingPending = false;
+        ranking.setEnabled(true);
+        ranking.setText("Xếp hạng");
+
+        String[] columns = {"#", "Tên", "Trận", "Điểm", "Thắng", "Thua", "Hòa"};
+        DefaultTableModel model = new DefaultTableModel(columns, 0) {
+            @Override public boolean isCellEditable(int row, int col) { return false; }
+        };
+        int rank = 1;
+        for (RankingEntry e : entries) {
+            model.addRow(new Object[]{rank++, e.username(), e.matchesPlayed(),
+                    e.score(), e.wins(), e.losses(), e.draws()});
+        }
+        JTable table = new JTable(model);
+        table.setFillsViewportHeight(true);
+        GameTheme.styleTable(table);
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(GameTheme.BORDER));
+        scroll.getViewport().setBackground(GameTheme.SURFACE);
+        scroll.setBackground(GameTheme.SURFACE);
+        JPanel root = GameTheme.background(new BorderLayout(0, 12));
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        JLabel title = new JLabel("Bảng xếp hạng (" + entries.size() + " người chơi)");
+        title.setForeground(GameTheme.ACCENT);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 15f));
+        root.add(title, BorderLayout.NORTH);
+        root.add(scroll, BorderLayout.CENTER);
+        JDialog dialog = new JDialog(this, "Bảng xếp hạng", true);
+        dialog.setContentPane(root);
+        dialog.setSize(700, 460);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    /** Displays the match history table in a dialog. */
+    public void showHistory(List<MatchHistoryEntry> entries) {
+        historyPending = false;
+        history.setEnabled(true);
+        history.setText("Lịch sử đấu");
+
+        String[] columns = {"ID", "Thời gian", "Đối thủ", "Điểm tôi", "Điểm đối thủ", "Kết quả"};
+        DefaultTableModel model = new DefaultTableModel(columns, 0) {
+            @Override public boolean isCellEditable(int row, int col) { return false; }
+        };
+        for (MatchHistoryEntry e : entries) {
+            model.addRow(new Object[]{e.matchId(), e.endedAt(), e.opponent(),
+                    e.playerScore(), e.opponentScore(), translateResult(e.result())});
+        }
+        JTable table = new JTable(model);
+        table.setFillsViewportHeight(true);
+        GameTheme.styleTable(table);
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(GameTheme.BORDER));
+        scroll.getViewport().setBackground(GameTheme.SURFACE);
+        scroll.setBackground(GameTheme.SURFACE);
+        JPanel root = GameTheme.background(new BorderLayout(0, 12));
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        String subtitle = entries.isEmpty() ? "Chưa có trận đấu nào." : entries.size() + " trận gần nhất";
+        JLabel title = new JLabel("Lịch sử đấu — " + subtitle);
+        title.setForeground(GameTheme.ACCENT);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 15f));
+        root.add(title, BorderLayout.NORTH);
+        root.add(scroll, BorderLayout.CENTER);
+        JDialog dialog = new JDialog(this, "Lịch sử đấu", true);
+        dialog.setContentPane(root);
+        dialog.setSize(800, 460);
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+    }
+
+    private static String translateResult(String result) {
+        return switch (result == null ? "" : result) {
+            case "WIN"  -> "Thắng";
+            case "LOSS" -> "Thua";
+            case "DRAW" -> "Hòa";
+            default     -> result;
+        };
     }
 
     @Override

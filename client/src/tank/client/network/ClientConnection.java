@@ -191,7 +191,7 @@ public final class ClientConnection implements AutoCloseable {
         try {
             return Long.parseLong(input.readUTF());
         } catch (NumberFormatException exception) {
-            throw new IOException("Server sent invalid numeric data.", exception);
+            throw new IOException("Server gửi dữ liệu số dài không hợp lệ.", exception);
         }
     }
 
@@ -210,7 +210,7 @@ public final class ClientConnection implements AutoCloseable {
     }
 
     private List<RankingEntry> readRanking() throws IOException {
-        int count = readBoundedCount("báº£ng xáº¿p háº¡ng", 1000);
+        int count = readBoundedCount("bảng xếp hạng", 1000);
         List<RankingEntry> entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             entries.add(new RankingEntry(input.readUTF(), readInt(), readInt(), readInt(), readInt(), readInt()));
@@ -219,7 +219,7 @@ public final class ClientConnection implements AutoCloseable {
     }
 
     private List<MatchHistoryEntry> readHistory() throws IOException {
-        int count = readBoundedCount("lá»‹ch sá»­ Ä‘áº¥u", 1000);
+        int count = readBoundedCount("lịch sử đấu", 1000);
         List<MatchHistoryEntry> entries = new ArrayList<>(count);
         for (int index = 0; index < count; index++) {
             entries.add(new MatchHistoryEntry(readLong(), input.readUTF(), input.readUTF(),
@@ -231,7 +231,7 @@ public final class ClientConnection implements AutoCloseable {
     private int readBoundedCount(String label, int max) throws IOException {
         int count = readInt();
         if (count < 0 || count > max) {
-            throw new IOException("Server gá»­i " + label + " khÃ´ng há»£p lá»‡.");
+            throw new IOException("Server gửi " + label + " không hợp lệ.");
         }
         return count;
     }

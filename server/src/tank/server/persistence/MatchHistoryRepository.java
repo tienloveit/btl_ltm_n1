@@ -12,7 +12,8 @@ import java.util.List;
 
 /** Stores one completed round and both participants for later history views. */
 public final class MatchHistoryRepository {
-    private static final DateTimeFormatter DISPLAY_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter DISPLAY_TIME =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private final DatabaseConfig databaseConfig;
 
     public MatchHistoryRepository(DatabaseConfig databaseConfig) { this.databaseConfig = databaseConfig; }

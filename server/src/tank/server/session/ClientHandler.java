@@ -122,9 +122,9 @@ public final class ClientHandler implements Runnable {
                 } else if (Protocol.PLAY_AGAIN.equals(messageType)) {
                     if (requireLogin() && games != null) { games.playAgain(username); }
                 } else if (Protocol.RANKING_REQUEST.equals(messageType)) {
-                    if (requireLogin()) { handleRankingRequest(); }
+                    if (requireLogin()) { handleRankingRequestSafe(); }
                 } else if (Protocol.HISTORY_REQUEST.equals(messageType)) {
-                    if (requireLogin()) { handleHistoryRequest(); }
+                    if (requireLogin()) { handleHistoryRequestSafe(); }
                 } else {
                     send(Protocol.SERVER_ERROR, "Message không được hỗ trợ.");
                 }
@@ -211,6 +211,24 @@ public final class ClientHandler implements Runnable {
         }
     }
 
+    private void handleRankingRequestSafe() throws IOException {
+        try {
+            handleRankingRequest();
+        } catch (SQLException exception) {
+            System.err.println("Ranking query failed" + clientLabel() + ": " + exception.getMessage());
+            send(Protocol.SERVER_ERROR, "Không thể tải bảng xếp hạng: " + exception.getMessage());
+        }
+    }
+
+    private void handleHistoryRequestSafe() throws IOException {
+        try {
+            handleHistoryRequest();
+        } catch (SQLException exception) {
+            System.err.println("History query failed" + clientLabel() + ": " + exception.getMessage());
+            send(Protocol.SERVER_ERROR, "Không thể tải lịch sử đấu: " + exception.getMessage());
+        }
+    }
+
     private void handleRankingRequest() throws IOException, SQLException {
         List<RankingRecord> records = accountService.ranking(100);
         List<String> values = new ArrayList<>();
@@ -228,7 +246,7 @@ public final class ClientHandler implements Runnable {
 
     private void handleHistoryRequest() throws IOException, SQLException {
         if (history == null) {
-            send(Protocol.SERVER_ERROR, "Lá»‹ch sá»­ Ä‘áº¥u chÆ°a Ä‘Æ°á»£c káº¿t ná»‘i.");
+            send(Protocol.SERVER_ERROR, "Lịch sử đấu chưa được kết nối.");
             return;
         }
         List<MatchHistoryRecord> records = history.listForPlayer(username, 100);
