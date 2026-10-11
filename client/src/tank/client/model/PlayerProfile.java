@@ -50,4 +50,10 @@ public final class PlayerProfile {
     public PlayerProfile withStatus(String nextStatus) {
         return new PlayerProfile(username, matchesPlayed, score, wins, losses, draws, nextStatus);
     }
+
+    public PlayerProfile withStats(int nextMatchesPlayed, int nextScore, int nextWins,
+                                   int nextLosses, int nextDraws, String nextStatus) {
+        return new PlayerProfile(username, nextMatchesPlayed, nextScore, nextWins, nextLosses,
+                nextDraws, nextStatus);
+    }
 }

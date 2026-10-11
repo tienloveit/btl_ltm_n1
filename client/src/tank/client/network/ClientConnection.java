@@ -4,6 +4,8 @@ import tank.client.model.PlayerSummary;
 import tank.client.model.PlayerProfile;
 import tank.client.model.RoomState;
 import tank.client.model.GameState;
+import tank.client.model.RankingEntry;
+import tank.client.model.MatchHistoryEntry;
 import tank.client.protocol.Protocol;
 
 import java.io.DataInputStream;
@@ -22,6 +24,9 @@ public final class ClientConnection implements AutoCloseable {
         void onLoginFailure(String message);
         void onRegisterResult(boolean success, String message);
         void onPlayerList(List<PlayerSummary> players);
+        default void onProfileUpdate(PlayerProfile profile) { }
+        default void onRanking(List<RankingEntry> entries) { }
+        default void onHistory(List<MatchHistoryEntry> entries) { }
         void onLogoutSuccess();
         void onDisconnected(String message);
         default void onChallengePending(String id, String opponent, int timeoutSeconds) { }
@@ -80,6 +85,8 @@ public final class ClientConnection implements AutoCloseable {
     public synchronized void shoot() throws IOException { send(Protocol.SHOOT); }
     public synchronized void exitGame() throws IOException { send(Protocol.EXIT); }
     public synchronized void playAgain() throws IOException { send(Protocol.PLAY_AGAIN); }
+    public synchronized void requestRanking() throws IOException { send(Protocol.RANKING_REQUEST); }
+    public synchronized void requestHistory() throws IOException { send(Protocol.HISTORY_REQUEST); }
 
     private void send(String messageType, String... values) throws IOException {
         if (closed.get() || output == null) {
@@ -98,14 +105,7 @@ public final class ClientConnection implements AutoCloseable {
             while (!closed.get()) {
                 String messageType = input.readUTF();
                 if (Protocol.LOGIN_SUCCESS.equals(messageType)) {
-                    listener.onLoginSuccess(new PlayerProfile(
-                            input.readUTF(),
-                            readInt(),
-                            readInt(),
-                            readInt(),
-                            readInt(),
-                            readInt(),
-                            input.readUTF()));
+                    listener.onLoginSuccess(readProfile());
                 } else if (Protocol.LOGIN_FAIL.equals(messageType)) {
                     listener.onLoginFailure(input.readUTF());
                 } else if (Protocol.REGISTER_SUCCESS.equals(messageType)) {
@@ -114,6 +114,8 @@ public final class ClientConnection implements AutoCloseable {
                     listener.onRegisterResult(false, input.readUTF());
                 } else if (Protocol.PLAYER_LIST.equals(messageType)) {
                     listener.onPlayerList(readPlayerList());
+                } else if (Protocol.PROFILE_UPDATE.equals(messageType)) {
+                    listener.onProfileUpdate(readProfile());
                 } else if (Protocol.LOGOUT_SUCCESS.equals(messageType)) {
                     listener.onLogoutSuccess();
                     return;
@@ -137,6 +139,10 @@ public final class ClientConnection implements AutoCloseable {
                     listener.onGameOver(input.readUTF(), input.readUTF(), input.readUTF());
                 } else if (Protocol.HIT_EFFECT.equals(messageType)) {
                     listener.onHitEffect(input.readUTF(), readInt(), readInt());
+                } else if (Protocol.RANKING_RESPONSE.equals(messageType)) {
+                    listener.onRanking(readRanking());
+                } else if (Protocol.HISTORY_RESPONSE.equals(messageType)) {
+                    listener.onHistory(readHistory());
                 } else if (Protocol.LOBBY_ERROR.equals(messageType)) {
                     listener.onLobbyError(input.readUTF());
                 } else {
@@ -168,11 +174,24 @@ public final class ClientConnection implements AutoCloseable {
         return players;
     }
 
+    private PlayerProfile readProfile() throws IOException {
+        return new PlayerProfile(input.readUTF(), readInt(), readInt(), readInt(), readInt(), readInt(),
+                input.readUTF());
+    }
+
     private int readInt() throws IOException {
         try {
             return Integer.parseInt(input.readUTF());
         } catch (NumberFormatException exception) {
             throw new IOException("Server gửi dữ liệu số không hợp lệ.", exception);
+        }
+    }
+
+    private long readLong() throws IOException {
+        try {
+            return Long.parseLong(input.readUTF());
+        } catch (NumberFormatException exception) {
+            throw new IOException("Server sent invalid numeric data.", exception);
         }
     }
 
@@ -188,6 +207,33 @@ public final class ClientConnection implements AutoCloseable {
             bullets.add(new GameState.Bullet(input.readUTF(), readInt(), readInt()));
         }
         return new GameState(roomId, seconds, player1, player2, List.copyOf(bullets));
+    }
+
+    private List<RankingEntry> readRanking() throws IOException {
+        int count = readBoundedCount("báº£ng xáº¿p háº¡ng", 1000);
+        List<RankingEntry> entries = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            entries.add(new RankingEntry(input.readUTF(), readInt(), readInt(), readInt(), readInt(), readInt()));
+        }
+        return List.copyOf(entries);
+    }
+
+    private List<MatchHistoryEntry> readHistory() throws IOException {
+        int count = readBoundedCount("lá»‹ch sá»­ Ä‘áº¥u", 1000);
+        List<MatchHistoryEntry> entries = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            entries.add(new MatchHistoryEntry(readLong(), input.readUTF(), input.readUTF(),
+                    readInt(), readInt(), input.readUTF()));
+        }
+        return List.copyOf(entries);
+    }
+
+    private int readBoundedCount(String label, int max) throws IOException {
+        int count = readInt();
+        if (count < 0 || count > max) {
+            throw new IOException("Server gá»­i " + label + " khÃ´ng há»£p lá»‡.");
+        }
+        return count;
     }
 
     @Override

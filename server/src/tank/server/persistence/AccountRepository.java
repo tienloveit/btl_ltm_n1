@@ -1,6 +1,7 @@
 package tank.server.persistence;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
 public interface AccountRepository {
@@ -11,6 +12,8 @@ public interface AccountRepository {
 
     Optional<AccountRecord> findByUsername(String username) throws SQLException;
 
-        boolean updateStatistics(String username, int matchesPlayed, int score, int wins, int losses, int draws)
+    List<RankingRecord> listRanking(int limit) throws SQLException;
+
+    boolean updateStatistics(String username, int matchesPlayed, int score, int wins, int losses, int draws)
             throws SQLException;
 }

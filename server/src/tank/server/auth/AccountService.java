@@ -10,8 +10,10 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import tank.server.persistence.RankingRecord;
 
 public final class AccountService {
     private static final int ITERATIONS = 120_000;
@@ -84,6 +86,10 @@ public final class AccountService {
             throw new SQLException("Không thể cập nhật thống kê người chơi.");
         }
         return new Account(record.username(), record.email(), played, score, wins, losses, draws);
+    }
+
+    public List<RankingRecord> ranking(int limit) throws SQLException {
+        return repository.listRanking(limit);
     }
 
     private static byte[] hash(char[] password, byte[] salt) {

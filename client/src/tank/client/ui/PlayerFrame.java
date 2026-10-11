@@ -42,7 +42,9 @@ public final class PlayerFrame extends JFrame {
         this.profile = profile;
         onlinePlayers = new OnlinePlayersPanel(profile.getUsername(), controller::challenge);
         waitingRoom = new WaitingRoomPanel(() -> {
-            if (roomId != null) { controller.leaveRoom(roomId); }
+            if (roomId != null) {
+                controller.leaveRoom(roomId);
+            }
         });
         gamePlay = new GamePlayPanel(profile.getUsername(), controller::moveLeft, controller::moveRight,
                 controller::shoot, controller::playAgain, controller::exitGame);
@@ -105,7 +107,10 @@ public final class PlayerFrame extends JFrame {
         setContentPane(root);
         setNavigationHandlers(null, null);
         addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosing(java.awt.event.WindowEvent event) { controller.logout(true); }
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent event) {
+                controller.logout(true);
+            }
         });
     }
 
@@ -145,7 +150,9 @@ public final class PlayerFrame extends JFrame {
         }
         button.setEnabled(action != null);
         button.setToolTipText(action == null ? "Chưa tích hợp" : null);
-        if (action != null) { button.addActionListener(event -> action.run()); }
+        if (action != null) {
+            button.addActionListener(event -> action.run());
+        }
     }
 
     public void updatePlayers(List<PlayerSummary> players) {
@@ -178,7 +185,9 @@ public final class PlayerFrame extends JFrame {
     }
 
     public void closeChallenge(String id, String reason) {
-        if (!id.equals(challengeId)) { return; }
+        if (!id.equals(challengeId)) {
+            return;
+        }
         challengeId = null;
         closeInvitation();
         cancel.setVisible(false);
@@ -210,19 +219,27 @@ public final class PlayerFrame extends JFrame {
     }
 
     public void updateGame(GameState state) {
-        if (state.roomId().equals(roomId)) { gamePlay.setState(state); }
+        if (state.roomId().equals(roomId)) {
+            gamePlay.setState(state);
+        }
     }
 
     public void showGameOver(String id, String winner, String reason) {
-        if (id.equals(roomId)) { gamePlay.gameOver(winner, reason); }
+        if (id.equals(roomId)) {
+            gamePlay.gameOver(winner, reason);
+        }
     }
 
     public void showHitEffect(String id, int x, int y) {
-        if (id.equals(roomId)) { gamePlay.showImpact(x, y); }
+        if (id.equals(roomId)) {
+            gamePlay.showImpact(x, y);
+        }
     }
 
     public void closeRoom(String id, String reason) {
-        if (!id.equals(roomId)) { return; }
+        if (!id.equals(roomId)) {
+            return;
+        }
         roomId = null;
         lobby.setEnabled(true);
         onlinePlayers.setRequesting(false);
@@ -234,7 +251,9 @@ public final class PlayerFrame extends JFrame {
         onlinePlayers.setRequesting(false);
         cancel.setEnabled(true);
         waitingRoom.setExitEnabled(true);
-        if (challengeDialog != null) { challengeDialog.setBusy(false); }
+        if (challengeDialog != null) {
+            challengeDialog.setBusy(false);
+        }
         showMessage(reason, true);
     }
 
@@ -251,7 +270,8 @@ public final class PlayerFrame extends JFrame {
         }
     }
 
-    @Override public void dispose() {
+    @Override
+    public void dispose() {
         closeInvitation();
         super.dispose();
     }

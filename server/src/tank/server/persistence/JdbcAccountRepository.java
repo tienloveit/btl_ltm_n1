@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public final class JdbcAccountRepository implements AccountRepository {
@@ -113,6 +115,31 @@ public final class JdbcAccountRepository implements AccountRepository {
                     result.getInt("wins"),
                     result.getInt("losses"),
                     result.getInt("draws")));
+            }
+        }
+    }
+
+    @Override
+    public List<RankingRecord> listRanking(int limit) throws SQLException {
+        String sql = "SELECT username, matches_played, score, wins, losses, draws "
+                + "FROM player_accounts "
+                + "ORDER BY score DESC, wins DESC, draws DESC, losses ASC, username ASC "
+                + "LIMIT ?";
+        try (Connection connection = databaseConfig.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, Math.max(1, limit));
+            try (ResultSet result = statement.executeQuery()) {
+                List<RankingRecord> records = new ArrayList<>();
+                while (result.next()) {
+                    records.add(new RankingRecord(
+                            result.getString("username"),
+                            result.getInt("matches_played"),
+                            result.getInt("score"),
+                            result.getInt("wins"),
+                            result.getInt("losses"),
+                            result.getInt("draws")));
+                }
+                return records;
             }
         }
     }

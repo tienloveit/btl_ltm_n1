@@ -4,6 +4,8 @@ import tank.client.model.PlayerSummary;
 import tank.client.model.PlayerProfile;
 import tank.client.model.RoomState;
 import tank.client.model.GameState;
+import tank.client.model.RankingEntry;
+import tank.client.model.MatchHistoryEntry;
 import tank.client.network.ClientConnection;
 import tank.client.ui.LoginFrame;
 import tank.client.ui.PlayerFrame;
@@ -130,6 +132,8 @@ public final class ClientController implements ClientConnection.Listener {
     public void shoot() { sendLobbyAction(ClientConnection::shoot); }
     public void exitGame() { sendLobbyAction(ClientConnection::exitGame); }
     public void playAgain() { sendLobbyAction(ClientConnection::playAgain); }
+    public void requestRanking() { sendLobbyAction(ClientConnection::requestRanking); }
+    public void requestHistory() { sendLobbyAction(ClientConnection::requestHistory); }
 
     private void sendLobbyAction(ConnectionAction action) {
         ClientConnection current = connection;
@@ -188,6 +192,18 @@ public final class ClientController implements ClientConnection.Listener {
                 playerFrame.updatePlayers(players);
             }
         });
+    }
+
+    @Override public void onProfileUpdate(PlayerProfile profile) {
+        withPlayerFrame(frame -> frame.updateProfile(profile));
+    }
+
+    @Override public void onRanking(List<RankingEntry> entries) {
+        withPlayerFrame(frame -> frame.showRanking(entries));
+    }
+
+    @Override public void onHistory(List<MatchHistoryEntry> entries) {
+        withPlayerFrame(frame -> frame.showHistory(entries));
     }
 
     @Override public void onChallengePending(String id, String opponent, int timeoutSeconds) {

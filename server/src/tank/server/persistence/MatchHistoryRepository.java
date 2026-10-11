@@ -5,9 +5,14 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Stores one completed round and both participants for later history views. */
 public final class MatchHistoryRepository {
+    private static final DateTimeFormatter DISPLAY_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private final DatabaseConfig databaseConfig;
 
     public MatchHistoryRepository(DatabaseConfig databaseConfig) { this.databaseConfig = databaseConfig; }
@@ -46,6 +51,37 @@ public final class MatchHistoryRepository {
         }
     }
 
+    public List<MatchHistoryRecord> listForPlayer(String username, int limit) throws SQLException {
+        String sql = "SELECT m.match_id, COALESCE(m.ended_at, m.started_at) AS ended_at, "
+                + "self.score AS player_score, opponent.username AS opponent_username, "
+                + "opponent.score AS opponent_score, self.result AS result "
+                + "FROM matches m "
+                + "JOIN match_players self ON self.match_id = m.match_id "
+                + "JOIN match_players opponent ON opponent.match_id = m.match_id "
+                + "WHERE self.username = ? AND opponent.username <> ? "
+                + "ORDER BY COALESCE(m.ended_at, m.started_at) DESC, m.match_id DESC "
+                + "LIMIT ?";
+        try (Connection connection = databaseConfig.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, username);
+            statement.setString(2, username);
+            statement.setInt(3, Math.max(1, limit));
+            try (ResultSet result = statement.executeQuery()) {
+                List<MatchHistoryRecord> records = new ArrayList<>();
+                while (result.next()) {
+                    records.add(new MatchHistoryRecord(
+                            result.getLong("match_id"),
+                            formatTime(result.getTimestamp("ended_at")),
+                            result.getString("opponent_username"),
+                            result.getInt("player_score"),
+                            result.getInt("opponent_score"),
+                            result.getString("result")));
+                }
+                return records;
+            }
+        }
+    }
+
     private static void addPlayer(PreparedStatement statement, long matchId, String username, int score, String result)
             throws SQLException {
         statement.setLong(1, matchId);
@@ -53,5 +89,9 @@ public final class MatchHistoryRepository {
         statement.setInt(3, score);
         statement.setString(4, result);
         statement.addBatch();
+    }
+
+    private static String formatTime(Timestamp timestamp) {
+        return timestamp == null ? "" : timestamp.toLocalDateTime().format(DISPLAY_TIME);
     }
 }

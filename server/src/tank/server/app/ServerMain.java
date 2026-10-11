@@ -40,8 +40,9 @@ public final class ServerMain {
         });
         scheduler.setRemoveOnCancelPolicy(true);
         RoomManager rooms = new RoomManager(sessions, scheduler);
+        MatchHistoryRepository matchHistoryRepository = new MatchHistoryRepository(databaseConfig);
         GameStateManager games = new GameStateManager(sessions, rooms, scheduler, accountService,
-                new MatchHistoryRepository(databaseConfig));
+                matchHistoryRepository);
         rooms.setGameListener(games);
         ChallengeManager challenges = new ChallengeManager(sessions, rooms, scheduler);
         sessions.setDisconnectListener(challenges::onDisconnect);
@@ -53,7 +54,8 @@ public final class ServerMain {
             while (!serverSocket.isClosed()) {
                 Socket socket = serverSocket.accept();
                 try {
-                    workers.execute(new ClientHandler(socket, accountService, sessions, challenges, rooms, games));
+                    workers.execute(new ClientHandler(socket, accountService, sessions, challenges, rooms,
+                            games, matchHistoryRepository));
                     System.out.println("Accepted connection from " + socket.getRemoteSocketAddress());
                 } catch (java.util.concurrent.RejectedExecutionException exception) {
                     socket.close();

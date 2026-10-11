@@ -5,6 +5,9 @@ import tank.server.protocol.Protocol;
 import tank.server.lobby.ChallengeManager;
 import tank.server.room.RoomManager;
 import tank.server.game.GameStateManager;
+import tank.server.persistence.MatchHistoryRecord;
+import tank.server.persistence.MatchHistoryRepository;
+import tank.server.persistence.RankingRecord;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -12,6 +15,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -26,6 +30,7 @@ public final class ClientHandler implements Runnable {
     private final ChallengeManager challenges;
     private final RoomManager rooms;
     private final GameStateManager games;
+    private final MatchHistoryRepository history;
     private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(256);
     private Thread writer;
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -41,17 +46,24 @@ public final class ClientHandler implements Runnable {
 
     public ClientHandler(Socket socket, AccountService accountService, PlayerSessionManager sessions,
                          ChallengeManager challenges, RoomManager rooms) {
-        this(socket, accountService, sessions, challenges, rooms, null);
+        this(socket, accountService, sessions, challenges, rooms, null, null);
     }
 
     public ClientHandler(Socket socket, AccountService accountService, PlayerSessionManager sessions,
                          ChallengeManager challenges, RoomManager rooms, GameStateManager games) {
+        this(socket, accountService, sessions, challenges, rooms, games, null);
+    }
+
+    public ClientHandler(Socket socket, AccountService accountService, PlayerSessionManager sessions,
+                         ChallengeManager challenges, RoomManager rooms, GameStateManager games,
+                         MatchHistoryRepository history) {
         this.socket = socket;
         this.accountService = accountService;
         this.sessions = sessions;
         this.challenges = challenges;
         this.rooms = rooms;
         this.games = games;
+        this.history = history;
     }
 
     @Override
@@ -109,6 +121,10 @@ public final class ClientHandler implements Runnable {
                     if (requireLogin() && games != null) { games.exit(username); }
                 } else if (Protocol.PLAY_AGAIN.equals(messageType)) {
                     if (requireLogin() && games != null) { games.playAgain(username); }
+                } else if (Protocol.RANKING_REQUEST.equals(messageType)) {
+                    if (requireLogin()) { handleRankingRequest(); }
+                } else if (Protocol.HISTORY_REQUEST.equals(messageType)) {
+                    if (requireLogin()) { handleHistoryRequest(); }
                 } else {
                     send(Protocol.SERVER_ERROR, "Message không được hỗ trợ.");
                 }
@@ -193,6 +209,40 @@ public final class ClientHandler implements Runnable {
                 Integer.toString(wins), Integer.toString(losses), Integer.toString(draws), status.name());
             sessions.broadcastPlayerList();
         }
+    }
+
+    private void handleRankingRequest() throws IOException, SQLException {
+        List<RankingRecord> records = accountService.ranking(100);
+        List<String> values = new ArrayList<>();
+        values.add(Integer.toString(records.size()));
+        for (RankingRecord record : records) {
+            values.add(record.username());
+            values.add(Integer.toString(record.matchesPlayed()));
+            values.add(Integer.toString(record.score()));
+            values.add(Integer.toString(record.wins()));
+            values.add(Integer.toString(record.losses()));
+            values.add(Integer.toString(record.draws()));
+        }
+        send(Protocol.RANKING_RESPONSE, values.toArray(String[]::new));
+    }
+
+    private void handleHistoryRequest() throws IOException, SQLException {
+        if (history == null) {
+            send(Protocol.SERVER_ERROR, "Lá»‹ch sá»­ Ä‘áº¥u chÆ°a Ä‘Æ°á»£c káº¿t ná»‘i.");
+            return;
+        }
+        List<MatchHistoryRecord> records = history.listForPlayer(username, 100);
+        List<String> values = new ArrayList<>();
+        values.add(Integer.toString(records.size()));
+        for (MatchHistoryRecord record : records) {
+            values.add(Long.toString(record.matchId()));
+            values.add(record.endedAt());
+            values.add(record.opponent());
+            values.add(Integer.toString(record.playerScore()));
+            values.add(Integer.toString(record.opponentScore()));
+            values.add(record.result());
+        }
+        send(Protocol.HISTORY_RESPONSE, values.toArray(String[]::new));
     }
 
     void sendPlayerList(List<PlayerSessionManager.PlayerSummary> players) throws IOException {

@@ -8,9 +8,14 @@ public final class Protocol {
     public static final String LOGIN_SUCCESS = "LOGIN_SUCCESS";
     public static final String LOGIN_FAIL = "LOGIN_FAIL";
     public static final String PLAYER_LIST = "PLAYER_LIST";
+    public static final String PROFILE_UPDATE = "PROFILE_UPDATE";
     public static final String LOGOUT_REQUEST = "LOGOUT_REQUEST";
     public static final String LOGOUT_SUCCESS = "LOGOUT_SUCCESS";
     public static final String SERVER_ERROR = "SERVER_ERROR";
+    public static final String RANKING_REQUEST = "RANKING_REQUEST";
+    public static final String RANKING_RESPONSE = "RANKING_RESPONSE";
+    public static final String HISTORY_REQUEST = "HISTORY_REQUEST";
+    public static final String HISTORY_RESPONSE = "HISTORY_RESPONSE";
     public static final String CHALLENGE = "CHALLENGE";
     public static final String CHALLENGE_PENDING = "CHALLENGE_PENDING";
     public static final String CHALLENGE_RECEIVED = "CHALLENGE_RECEIVED";

@@ -1,5 +1,7 @@
 package tank.server.session;
 
+import tank.server.protocol.Protocol;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -76,6 +78,9 @@ public final class PlayerSessionManager {
         ClientHandler handler = sessions.get(username);
         if (handler != null) {
             handler.updateStatistics(matchesPlayed, score, wins, losses, draws);
+            sendTo(username, Protocol.PROFILE_UPDATE, username, Integer.toString(matchesPlayed),
+                    Integer.toString(score), Integer.toString(wins), Integer.toString(losses),
+                    Integer.toString(draws), handler.getStatus().name());
             broadcastPlayerList();
         }
     }

@@ -50,8 +50,15 @@ public final class GameStateManager implements RoomManager.GameListener {
     }
 
     @Override public void onPlayerLeft(RoomManager.RoomInfo room, String username) {
-        Match match = matches.remove(room.roomId());
-        if (match != null && match.task != null) { match.task.cancel(false); }
+        Match match = matches.get(room.roomId());
+        if (match == null) { return; }
+        synchronized (match) {
+            if (!match.finished) {
+                finish(match, match.other(username).username, username + " Ä‘Ã£ rá»i tráº­n.");
+            }
+            if (match.task != null) { match.task.cancel(false); }
+            matches.remove(room.roomId(), match);
+        }
     }
 
     public void move(String username, boolean left) {
