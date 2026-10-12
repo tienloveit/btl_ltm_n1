@@ -54,7 +54,7 @@ public final class GameStateManager implements RoomManager.GameListener {
         if (match == null) { return; }
         synchronized (match) {
             if (!match.finished) {
-                finish(match, match.other(username).username, username + " Ä‘Ã£ rá»i tráº­n.");
+                finish(match, match.other(username).username, username + " đã rời trận.");
             }
             if (match.task != null) { match.task.cancel(false); }
             matches.remove(room.roomId(), match);
@@ -109,10 +109,15 @@ public final class GameStateManager implements RoomManager.GameListener {
             if (!match.finished) { return; }
             if (match.player1.username.equals(username)) { match.player1Ready = true; }
             else { match.player2Ready = true; }
-            sessions.sendTo(match.player1.username, Protocol.GAME_OVER, match.room.roomId(),
-                    "WAITING", "Đang chờ đối thủ chọn Chơi tiếp.");
-            sessions.sendTo(match.player2.username, Protocol.GAME_OVER, match.room.roomId(),
-                    "WAITING", "Đang chờ đối thủ chọn Chơi tiếp.");
+            // Only notify the player who hasn't chosen yet
+            if (!match.player1Ready) {
+                sessions.sendTo(match.player1.username, Protocol.GAME_OVER, match.room.roomId(),
+                        "WAITING", "Đối thủ muốn chơi tiếp. Bạn có muốn không?");
+            }
+            if (!match.player2Ready) {
+                sessions.sendTo(match.player2.username, Protocol.GAME_OVER, match.room.roomId(),
+                        "WAITING", "Đối thủ muốn chơi tiếp. Bạn có muốn không?");
+            }
             if (match.player1Ready && match.player2Ready) { reset(match); }
         }
     }
@@ -173,7 +178,6 @@ public final class GameStateManager implements RoomManager.GameListener {
             if (match.finished) { return; }
             match.finished = true;
             if (match.task != null) { match.task.cancel(false); }
-            // Preserve the final HP/ammo/bullet snapshot before the result notification.
             broadcast(match);
             persistResult(match, winner);
             sessions.sendTo(match.player1.username, Protocol.GAME_OVER, match.room.roomId(), winner, reason);
@@ -260,8 +264,13 @@ public final class GameStateManager implements RoomManager.GameListener {
             player1 = new Tank(room.player1(), FIELD_WIDTH / 2, true);
             player2 = new Tank(room.player2(), FIELD_WIDTH / 2, false);
         }
-        Tank tankFor(String username) { return player1.username.equals(username) ? player1 : player2.username.equals(username) ? player2 : null; }
-        Tank other(String username) { return player1.username.equals(username) ? player2 : player1; }
+        Tank tankFor(String username) {
+            return player1.username.equals(username) ? player1
+                    : player2.username.equals(username) ? player2 : null;
+        }
+        Tank other(String username) {
+            return player1.username.equals(username) ? player2 : player1;
+        }
     }
 
     private static final class Tank {
@@ -272,7 +281,9 @@ public final class GameStateManager implements RoomManager.GameListener {
         int ammo = START_AMMO;
         int score;
         long lastShot;
-        Tank(String username, int x, boolean bottomPlayer) { this.username = username; this.x = x; this.bottomPlayer = bottomPlayer; }
+        Tank(String username, int x, boolean bottomPlayer) {
+            this.username = username; this.x = x; this.bottomPlayer = bottomPlayer;
+        }
         void reset() { x = FIELD_WIDTH / 2; hp = START_HP; ammo = START_AMMO; score = 0; lastShot = 0; }
     }
 
@@ -281,6 +292,8 @@ public final class GameStateManager implements RoomManager.GameListener {
         final int x;
         final int velocity;
         int y;
-        Bullet(String owner, int x, int y, int velocity) { this.owner = owner; this.x = x; this.y = y; this.velocity = velocity; }
+        Bullet(String owner, int x, int y, int velocity) {
+            this.owner = owner; this.x = x; this.y = y; this.velocity = velocity;
+        }
     }
 }

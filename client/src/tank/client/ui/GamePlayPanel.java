@@ -231,19 +231,46 @@ final class GamePlayPanel extends JPanel {
                                            boolean aboveTank, int left, int width) {
             int center = mapX(tankX, left, width);
             String line1 = name;
-            String line2 = "HP: " + tank.hp() + "   Ammo: " + tank.ammo() + "   Score: " + tank.score();
+            String line2 = "Ammo: " + tank.ammo() + "   Score: " + tank.score();
             g.setFont(g.getFont().deriveFont(Font.BOLD, 14f));
-            int infoWidth = Math.max(g.getFontMetrics().stringWidth(line1), g.getFontMetrics().stringWidth(line2));
+            int infoWidth = Math.max(150, Math.max(g.getFontMetrics().stringWidth(line1), g.getFontMetrics().stringWidth(line2)));
             int textLeft = Math.max(left + 8, Math.min(center - infoWidth / 2, left + width - infoWidth - 8));
-            int firstBaseline = aboveTank ? y - 18 : y + 16;
-            int secondBaseline = aboveTank ? y : y + 35;
-            g.setColor(new Color(0, 0, 0, 130));
-            int cardTop = aboveTank ? firstBaseline - 16 : firstBaseline - 16;
-            g.fillRoundRect(textLeft - 8, cardTop, infoWidth + 16, 39, 9, 9);
+
+            // card height: name + HP bar + stats text = ~58px
+            int cardTop = aboveTank ? y - 60 : y + 4;
+            g.setColor(new Color(0, 0, 0, 145));
+            g.fillRoundRect(textLeft - 8, cardTop, infoWidth + 16, 58, 9, 9);
+
+            int nameBaseline  = cardTop + 16;
+            int barTop        = cardTop + 22;
+            int statsBaseline = cardTop + 52;
+
+            // Name
             g.setColor(GameTheme.TEXT);
-            g.drawString(line1, textLeft, firstBaseline);
+            g.drawString(line1, textLeft, nameBaseline);
+
+            // HP bar background
+            int barW = infoWidth;
+            g.setColor(new Color(60, 30, 30));
+            g.fillRoundRect(textLeft, barTop, barW, 10, 5, 5);
+            // HP bar fill — green → yellow → red based on HP
+            float ratio = Math.max(0f, Math.min(1f, tank.hp() / 100f));
+            Color barColor = ratio > 0.5f
+                    ? new Color(0, 200, 80)
+                    : ratio > 0.25f ? new Color(230, 190, 30) : new Color(220, 50, 50);
+            g.setColor(barColor);
+            g.fillRoundRect(textLeft, barTop, Math.max(4, (int)(barW * ratio)), 10, 5, 5);
+            // HP text on bar
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 9f));
+            String hpText = tank.hp() + " / 100";
+            int hpTextW = g.getFontMetrics().stringWidth(hpText);
+            g.setColor(Color.WHITE);
+            g.drawString(hpText, textLeft + (barW - hpTextW) / 2, barTop + 9);
+
+            // Stats line
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 12f));
             g.setColor(GameTheme.MUTED);
-            g.drawString(line2, textLeft, secondBaseline);
+            g.drawString(line2, textLeft, statsBaseline);
         }
         private static void drawTank(Graphics2D g, int x, int y, boolean up, Color color) {
             int center = mapX(x, 18, Math.max(1, g.getClipBounds().width - 36));
