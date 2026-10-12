@@ -21,6 +21,10 @@ import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.awt.GraphicsDevice;
+import java.awt.Rectangle;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.util.List;
 
 public final class PlayerFrame extends JFrame {
@@ -48,6 +52,16 @@ public final class PlayerFrame extends JFrame {
     private final JLabel winsLabel = new JLabel();
     private final JLabel lossesLabel = new JLabel();
     private final JLabel drawsLabel = new JLabel();
+    private final JPanel root;
+    private final JPanel header;
+    private final JPanel sidebar;
+    private final JPanel footer;
+    private boolean fullScreen;
+    private boolean gameVisible;
+    private GraphicsDevice fullScreenDevice;
+    private Rectangle windowedBounds;
+    private int windowedState;
+    private Dimension windowedMinimumSize;
 
     public PlayerFrame(ClientController controller, PlayerProfile profile) {
         super("Tank Arena - Lobby");
@@ -60,16 +74,22 @@ public final class PlayerFrame extends JFrame {
             }
         });
         gamePlay = new GamePlayPanel(profile.getUsername(), controller::moveLeft, controller::moveRight,
-                controller::shoot, controller::playAgain, controller::exitGame);
+                controller::shoot, controller::playAgain, controller::exitGame,
+                () -> setFullScreen(!fullScreen), () -> setFullScreen(false));
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         setSize(1000, 620);
         setMinimumSize(new Dimension(900, 540));
         setLocationRelativeTo(null);
+        windowedBounds = getBounds();
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentMoved(ComponentEvent event) { rememberWindowedBounds(); }
+            @Override public void componentResized(ComponentEvent event) { rememberWindowedBounds(); }
+        });
         GameTheme.styleWindow(this);
 
-        JPanel root = GameTheme.background(new BorderLayout(18, 18));
+        root = GameTheme.background(new BorderLayout(18, 18));
         root.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        JPanel header = GameTheme.card(new GridLayout(1, 5, 12, 0));
+        header = GameTheme.card(new GridLayout(1, 5, 12, 0));
         header.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
         JButton name = GameTheme.button(profile.getUsername(), false);
         name.setToolTipText("Xem thông tin người chơi");
@@ -81,7 +101,7 @@ public final class PlayerFrame extends JFrame {
         header.add(stat("Hòa", profile.getDraws(), drawsLabel));
         root.add(header, BorderLayout.NORTH);
 
-        JPanel sidebar = GameTheme.card(new BorderLayout(0, 20));
+        sidebar = GameTheme.card(new BorderLayout(0, 20));
         sidebar.setPreferredSize(new Dimension(165, 0));
         sidebar.setBorder(BorderFactory.createEmptyBorder(18, 12, 18, 12));
         JPanel menu = new JPanel(new GridLayout(4, 1, 0, 12));
@@ -104,7 +124,7 @@ public final class PlayerFrame extends JFrame {
         content.add(waitingRoom, "room");
         content.add(gamePlay, "game");
         root.add(content, BorderLayout.CENTER);
-        JPanel footer = new JPanel(new BorderLayout(16, 0));
+        footer = new JPanel(new BorderLayout(16, 0));
         footer.setOpaque(false);
         message.setForeground(GameTheme.MUTED);
         cancel.setVisible(false);
@@ -125,6 +145,58 @@ public final class PlayerFrame extends JFrame {
                 controller.logout(true);
             }
         });
+    }
+
+    private void rememberWindowedBounds() {
+        if (!fullScreen && getExtendedState() == NORMAL && isShowing()) {
+            windowedBounds = getBounds();
+        }
+    }
+
+    private void setFullScreen(boolean enabled) {
+        if (enabled == fullScreen || (enabled && !gameVisible)) {
+            return;
+        }
+        boolean wasVisible = isVisible();
+        if (enabled) {
+            rememberWindowedBounds();
+            windowedState = getExtendedState();
+            windowedMinimumSize = getMinimumSize();
+            fullScreenDevice = getGraphicsConfiguration().getDevice();
+            fullScreen = true;
+            // Recreate the native peer without invoking application logout/disposal.
+            super.dispose();
+            setExtendedState(NORMAL);
+            setUndecorated(true);
+            setMinimumSize(new Dimension(0, 0));
+            setLobbyChromeVisible(false);
+            fullScreenDevice.setFullScreenWindow(this);
+        } else {
+            fullScreenDevice.setFullScreenWindow(null);
+            fullScreenDevice = null;
+            super.dispose();
+            setUndecorated(false);
+            setMinimumSize(windowedMinimumSize);
+            setLobbyChromeVisible(true);
+            setBounds(windowedBounds);
+            setExtendedState(windowedState);
+            fullScreen = false;
+        }
+        gamePlay.setFullScreen(enabled);
+        setVisible(wasVisible);
+        validate();
+        gamePlay.requestFocusInWindow();
+    }
+
+    private void setLobbyChromeVisible(boolean visible) {
+        header.setVisible(visible);
+        sidebar.setVisible(visible);
+        footer.setVisible(visible);
+        int padding = visible ? 20 : 0;
+        root.setBorder(BorderFactory.createEmptyBorder(padding, padding, padding, padding));
+        BorderLayout layout = (BorderLayout) root.getLayout();
+        layout.setHgap(visible ? 18 : 0);
+        layout.setVgap(visible ? 18 : 0);
     }
 
     private static JPanel stat(String caption, int value, JLabel number) {
@@ -223,6 +295,8 @@ public final class PlayerFrame extends JFrame {
     }
 
     public void showRoom(RoomState room) {
+        setFullScreen(false);
+        gameVisible = false;
         closeInvitation();
         challengeId = null;
         roomId = room.roomId();
@@ -239,6 +313,7 @@ public final class PlayerFrame extends JFrame {
     }
 
     public void showGame(String id, String player1, String player2) {
+        gameVisible = true;
         roomId = id;
         gamePlay.start(id, player1, player2);
         cards.show(content, "game");
@@ -267,6 +342,8 @@ public final class PlayerFrame extends JFrame {
         if (!id.equals(roomId)) {
             return;
         }
+        setFullScreen(false);
+        gameVisible = false;
         roomId = null;
         lobby.setEnabled(true);
         onlinePlayers.setRequesting(false);
@@ -400,6 +477,11 @@ public final class PlayerFrame extends JFrame {
 
     @Override
     public void dispose() {
+        if (fullScreenDevice != null) {
+            fullScreenDevice.setFullScreenWindow(null);
+            fullScreenDevice = null;
+        }
+        fullScreen = false;
         closeInvitation();
         super.dispose();
     }

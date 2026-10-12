@@ -29,6 +29,7 @@ final class GamePlayPanel extends JPanel {
     private final Runnable shoot;
     private final Runnable playAgain;
     private final Runnable exit;
+    private final JButton fullScreenButton = GameTheme.button("Toàn màn hình", false);
     private final JButton playAgainButton = GameTheme.button("CHƠI TIẾP", true);
     private final JLabel timer = new JLabel("03:00", JLabel.CENTER);
     private final JLabel notice = new JLabel("Đang chờ trạng thái trận đấu từ Server...", JLabel.CENTER);
@@ -37,7 +38,7 @@ final class GamePlayPanel extends JPanel {
     private String player2Name = "P2";
 
     GamePlayPanel(String localPlayer, Runnable moveLeft, Runnable moveRight, Runnable shoot,
-                  Runnable playAgain, Runnable exit) {
+                  Runnable playAgain, Runnable exit, Runnable toggleFullScreen, Runnable exitFullScreen) {
         super(new BorderLayout(12, 12));
         this.localPlayer = localPlayer;
         this.moveLeft = moveLeft;
@@ -72,15 +73,24 @@ final class GamePlayPanel extends JPanel {
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
         actions.add(playAgainButton);
+        fullScreenButton.setFocusable(false);
+        fullScreenButton.addActionListener(event -> toggleFullScreen.run());
+        actions.add(fullScreenButton);
         JButton exitButton = GameTheme.dangerButton("EXIT");
         exitButton.addActionListener(event -> exit.run());
         actions.add(exitButton);
         footer.add(actions, BorderLayout.EAST);
         add(footer, BorderLayout.SOUTH);
         bindKeys();
+        getInputMap(WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke("ESCAPE"), "exit-full-screen");
+        getActionMap().put("exit-full-screen", action(exitFullScreen));
         new javax.swing.Timer(40, event -> {
             if (arena.expireImpacts()) { arena.repaint(); }
         }).start();
+    }
+
+    void setFullScreen(boolean fullScreen) {
+        fullScreenButton.setText(fullScreen ? "Về cửa sổ" : "Toàn màn hình");
     }
 
     void start(String roomId, String player1, String player2) {
