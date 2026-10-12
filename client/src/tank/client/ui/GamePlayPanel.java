@@ -52,7 +52,7 @@ final class GamePlayPanel extends JPanel {
         JPanel header = GameTheme.card(new GridLayout(1, 1));
         header.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 14, 10, 14));
         timer.setForeground(GameTheme.ACCENT);
-        timer.setFont(timer.getFont().deriveFont(Font.BOLD, 26f));
+        timer.setFont(timer.getFont().deriveFont(Font.BOLD, 29f));
         header.add(timer);
         add(header, BorderLayout.NORTH);
 
@@ -62,8 +62,10 @@ final class GamePlayPanel extends JPanel {
         footer.setOpaque(false);
         JLabel controls = new JLabel("Di chuyển:  ←  →       Bắn:  SPACE");
         controls.setForeground(GameTheme.MUTED);
+        controls.setFont(controls.getFont().deriveFont(14f));
         footer.add(controls, BorderLayout.WEST);
         notice.setForeground(GameTheme.MUTED);
+        notice.setFont(notice.getFont().deriveFont(14f));
         footer.add(notice, BorderLayout.CENTER);
         playAgainButton.setVisible(false);
         playAgainButton.addActionListener(event -> {
@@ -154,7 +156,7 @@ final class GamePlayPanel extends JPanel {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             // Reserve space above/below the grid for player information.
-            int left = 18, top = 45, width = getWidth() - 36, height = getHeight() - 90;
+            int left = 18, top = 85, width = getWidth() - 36, height = getHeight() - 170;
             g.setColor(new Color(8, 24, 28));
             g.fillRoundRect(left, top, width, height, 20, 20);
             g.setColor(GameTheme.BORDER);
@@ -168,13 +170,15 @@ final class GamePlayPanel extends JPanel {
                 GameState.Tank opponentTank = localIsPlayer1 ? state.player2() : state.player1();
                 String localName = localIsPlayer1 ? player1Name : player2Name;
                 String opponentName = localIsPlayer1 ? player2Name : player1Name;
+                String localTitle = (localIsPlayer1 ? "Tank 1" : "Tank 2") + " • Bạn: " + localName;
+                String opponentTitle = (localIsPlayer1 ? "Tank 2" : "Tank 1") + " • Đối thủ: " + opponentName;
                 int opponentY = top + 10;
                 int localY = top + height - 65;
                 // Every client sees their own tank below and the opponent above.
                 drawTank(g, opponentTank.x(), opponentY, false, new Color(255, 153, 84));
                 drawTank(g, localTank.x(), localY, true, GameTheme.ACCENT);
-                drawPlayerInfo(g, opponentTank.x(), top - 5, opponentName, opponentTank, true, left, width);
-                drawPlayerInfo(g, localTank.x(), top + height, localName, localTank, false, left, width);
+                drawPlayerInfo(g, opponentTank.x(), top - 5, opponentTitle, opponentTank, true, left, width);
+                drawPlayerInfo(g, localTank.x(), top + height, localTitle, localTank, false, left, width);
                 g.setColor(GameTheme.CYAN);
                 for (GameState.Bullet bullet : state.bullets()) {
                     int x = mapX(bullet.x(), left, width);
@@ -191,7 +195,7 @@ final class GamePlayPanel extends JPanel {
                 g.setColor(new Color(0, 0, 0, 150));
                 g.fillRoundRect(left + width / 4, top + height / 2 - 40, width / 2, 80, 16, 16);
                 g.setColor(GameTheme.TEXT);
-                g.setFont(g.getFont().deriveFont(Font.BOLD, 24f));
+                g.setFont(g.getFont().deriveFont(Font.BOLD, 26f));
                 int textWidth = g.getFontMetrics().stringWidth(gameOver);
                 g.drawString(gameOver, left + (width - textWidth) / 2, top + height / 2 + 8);
             }
@@ -242,18 +246,18 @@ final class GamePlayPanel extends JPanel {
             int center = mapX(tankX, left, width);
             String line1 = name;
             String line2 = "Ammo: " + tank.ammo() + "   Score: " + tank.score();
-            g.setFont(g.getFont().deriveFont(Font.BOLD, 14f));
-            int infoWidth = Math.max(150, Math.max(g.getFontMetrics().stringWidth(line1), g.getFontMetrics().stringWidth(line2)));
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 19f));
+            int infoWidth = Math.max(220, Math.max(g.getFontMetrics().stringWidth(line1), g.getFontMetrics().stringWidth(line2)));
             int textLeft = Math.max(left + 8, Math.min(center - infoWidth / 2, left + width - infoWidth - 8));
 
-            // card height: name + HP bar + stats text = ~58px
-            int cardTop = aboveTank ? y - 60 : y + 4;
+            // Card stays outside the grid: name + HP bar + ammo/score.
+            int cardTop = aboveTank ? y - 70 : y + 4;
             g.setColor(new Color(0, 0, 0, 145));
-            g.fillRoundRect(textLeft - 8, cardTop, infoWidth + 16, 58, 9, 9);
+            g.fillRoundRect(textLeft - 8, cardTop, infoWidth + 16, 68, 9, 9);
 
-            int nameBaseline  = cardTop + 16;
-            int barTop        = cardTop + 22;
-            int statsBaseline = cardTop + 52;
+            int nameBaseline  = cardTop + 20;
+            int barTop        = cardTop + 28;
+            int statsBaseline = cardTop + 61;
 
             // Name
             g.setColor(GameTheme.TEXT);
@@ -262,23 +266,23 @@ final class GamePlayPanel extends JPanel {
             // HP bar background
             int barW = infoWidth;
             g.setColor(new Color(60, 30, 30));
-            g.fillRoundRect(textLeft, barTop, barW, 10, 5, 5);
+            g.fillRoundRect(textLeft, barTop, barW, 12, 6, 6);
             // HP bar fill — green → yellow → red based on HP
             float ratio = Math.max(0f, Math.min(1f, tank.hp() / 100f));
             Color barColor = ratio > 0.5f
                     ? new Color(0, 200, 80)
                     : ratio > 0.25f ? new Color(230, 190, 30) : new Color(220, 50, 50);
             g.setColor(barColor);
-            g.fillRoundRect(textLeft, barTop, Math.max(4, (int)(barW * ratio)), 10, 5, 5);
+            g.fillRoundRect(textLeft, barTop, Math.max(4, (int)(barW * ratio)), 12, 6, 6);
             // HP text on bar
-            g.setFont(g.getFont().deriveFont(Font.BOLD, 9f));
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 11f));
             String hpText = tank.hp() + " / 100";
             int hpTextW = g.getFontMetrics().stringWidth(hpText);
             g.setColor(Color.WHITE);
-            g.drawString(hpText, textLeft + (barW - hpTextW) / 2, barTop + 9);
+            g.drawString(hpText, textLeft + (barW - hpTextW) / 2, barTop + 10);
 
             // Stats line
-            g.setFont(g.getFont().deriveFont(Font.BOLD, 12f));
+            g.setFont(g.getFont().deriveFont(Font.BOLD, 17f));
             g.setColor(GameTheme.MUTED);
             g.drawString(line2, textLeft, statsBaseline);
         }

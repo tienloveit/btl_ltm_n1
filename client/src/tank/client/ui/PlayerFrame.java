@@ -37,9 +37,12 @@ public final class PlayerFrame extends JFrame {
     private final JLabel message = new JLabel("Chọn đối thủ đang chờ để thách đấu.");
     private final JLabel status = new JLabel();
     private final JButton cancel = GameTheme.button("Hủy lời mời", false);
-    private final JButton lobby = GameTheme.button("Lobby", true);
+    private final JButton lobby = GameTheme.button("Lobby", false);
     private final JButton ranking = GameTheme.button("Xếp hạng", false);
     private final JButton history = GameTheme.button("Lịch sử đấu", false);
+    private final JButton logout = GameTheme.button("Đăng xuất", false);
+    private final JPanel rankingView = GameTheme.card(new BorderLayout(0, 12));
+    private final JPanel historyView = GameTheme.card(new BorderLayout(0, 12));
     // Track pending requests to show loading state and re-enable on response/error
     private boolean rankingPending = false;
     private boolean historyPending = false;
@@ -106,27 +109,33 @@ public final class PlayerFrame extends JFrame {
         sidebar.setBorder(BorderFactory.createEmptyBorder(18, 12, 18, 12));
         JPanel menu = new JPanel(new GridLayout(4, 1, 0, 12));
         menu.setOpaque(false);
-        lobby.addActionListener(event -> cards.show(content, "lobby"));
-        JButton logout = GameTheme.button("Đăng xuất", false);
-        logout.addActionListener(event -> controller.logout(false));
+        lobby.addActionListener(event -> showLobby());
+        logout.addActionListener(event -> {
+            selectNavigation(logout);
+            controller.logout(false);
+        });
         menu.add(lobby);
         menu.add(ranking);
         menu.add(history);
         menu.add(logout);
         sidebar.add(menu, BorderLayout.NORTH);
         status.setForeground(GameTheme.ACCENT);
+        status.setFont(status.getFont().deriveFont(Font.BOLD, 14f));
         status.setText(OnlinePlayersPanel.statusText(profile.getStatus()));
         sidebar.add(status, BorderLayout.SOUTH);
         root.add(sidebar, BorderLayout.WEST);
 
         content.setOpaque(false);
         content.add(onlinePlayers, "lobby");
+        content.add(rankingView, "ranking");
+        content.add(historyView, "history");
         content.add(waitingRoom, "room");
         content.add(gamePlay, "game");
         root.add(content, BorderLayout.CENTER);
         footer = new JPanel(new BorderLayout(16, 0));
         footer.setOpaque(false);
         message.setForeground(GameTheme.MUTED);
+        message.setFont(message.getFont().deriveFont(14f));
         cancel.setVisible(false);
         cancel.addActionListener(event -> {
             if (challengeId != null) {
@@ -139,6 +148,7 @@ public final class PlayerFrame extends JFrame {
         root.add(footer, BorderLayout.SOUTH);
         setContentPane(root);
         setNavigationHandlers(null, null);
+        showLobby();
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent event) {
@@ -204,9 +214,10 @@ public final class PlayerFrame extends JFrame {
         panel.setOpaque(false);
         JLabel title = new JLabel(caption);
         title.setForeground(GameTheme.MUTED);
+        title.setFont(title.getFont().deriveFont(14f));
         number.setText(Integer.toString(value));
         number.setForeground(GameTheme.TEXT);
-        number.setFont(number.getFont().deriveFont(Font.BOLD, 23f));
+        number.setFont(number.getFont().deriveFont(Font.BOLD, 25f));
         panel.add(title, BorderLayout.NORTH);
         panel.add(number, BorderLayout.CENTER);
         return panel;
@@ -230,6 +241,9 @@ public final class PlayerFrame extends JFrame {
                 rankingPending = true;
                 ranking.setEnabled(false);
                 ranking.setText("Đang tải…");
+                showLoading(rankingView, "Bảng xếp hạng", "Đang tải dữ liệu bảng xếp hạng...");
+                selectNavigation(ranking);
+                cards.show(content, "ranking");
                 onRanking.run();
             }
         });
@@ -238,9 +252,24 @@ public final class PlayerFrame extends JFrame {
                 historyPending = true;
                 history.setEnabled(false);
                 history.setText("Đang tải…");
+                showLoading(historyView, "Lịch sử đấu", "Đang tải lịch sử trận đấu...");
+                selectNavigation(history);
+                cards.show(content, "history");
                 onHistory.run();
             }
         });
+    }
+
+    private void showLobby() {
+        selectNavigation(lobby);
+        cards.show(content, "lobby");
+    }
+
+    private void selectNavigation(JButton selected) {
+        GameTheme.setNavigationSelected(lobby, selected == lobby);
+        GameTheme.setNavigationSelected(ranking, selected == ranking);
+        GameTheme.setNavigationSelected(history, selected == history);
+        GameTheme.setNavigationSelected(logout, selected == logout);
     }
 
     private static void configureNavigation(JButton button, Runnable action) {
@@ -304,6 +333,7 @@ public final class PlayerFrame extends JFrame {
         lobby.setEnabled(false);
         waitingRoom.setRoom(room);
         cards.show(content, "room");
+        selectNavigation(null);
         showMessage("Hai người đã sẵn sàng. Chờ Server bắt đầu trận.", false);
     }
 
@@ -317,6 +347,7 @@ public final class PlayerFrame extends JFrame {
         roomId = id;
         gamePlay.start(id, player1, player2);
         cards.show(content, "game");
+        selectNavigation(null);
         gamePlay.requestFocusInWindow();
     }
 
@@ -347,7 +378,7 @@ public final class PlayerFrame extends JFrame {
         roomId = null;
         lobby.setEnabled(true);
         onlinePlayers.setRequesting(false);
-        cards.show(content, "lobby");
+        showLobby();
         showMessage(reason, false);
     }
 
@@ -394,7 +425,7 @@ public final class PlayerFrame extends JFrame {
         drawsLabel.setText(Integer.toString(updated.getDraws()));
     }
 
-    /** Displays the ranking table in a dialog. */
+    /** Displays the ranking table inside the lobby content area. */
     public void showRanking(List<RankingEntry> entries) {
         rankingPending = false;
         ranking.setEnabled(true);
@@ -413,24 +444,16 @@ public final class PlayerFrame extends JFrame {
         table.setFillsViewportHeight(true);
         GameTheme.styleTable(table);
         JScrollPane scroll = new JScrollPane(table);
+        scroll.setColumnHeaderView(table.getTableHeader());
         scroll.setBorder(BorderFactory.createLineBorder(GameTheme.BORDER));
         scroll.getViewport().setBackground(GameTheme.SURFACE);
         scroll.setBackground(GameTheme.SURFACE);
-        JPanel root = GameTheme.background(new BorderLayout(0, 12));
-        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
-        JLabel title = new JLabel("Bảng xếp hạng (" + entries.size() + " người chơi)");
-        title.setForeground(GameTheme.ACCENT);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 15f));
-        root.add(title, BorderLayout.NORTH);
-        root.add(scroll, BorderLayout.CENTER);
-        JDialog dialog = new JDialog(this, "Bảng xếp hạng", true);
-        dialog.setContentPane(root);
-        dialog.setSize(700, 460);
-        dialog.setLocationRelativeTo(this);
-        dialog.setVisible(true);
+        showData(rankingView, "Bảng xếp hạng (" + entries.size() + " người chơi)", scroll);
+        selectNavigation(ranking);
+        cards.show(content, "ranking");
     }
 
-    /** Displays the match history table in a dialog. */
+    /** Displays the match history table inside the lobby content area. */
     public void showHistory(List<MatchHistoryEntry> entries) {
         historyPending = false;
         history.setEnabled(true);
@@ -448,22 +471,32 @@ public final class PlayerFrame extends JFrame {
         table.setFillsViewportHeight(true);
         GameTheme.styleTable(table);
         JScrollPane scroll = new JScrollPane(table);
+        scroll.setColumnHeaderView(table.getTableHeader());
         scroll.setBorder(BorderFactory.createLineBorder(GameTheme.BORDER));
         scroll.getViewport().setBackground(GameTheme.SURFACE);
         scroll.setBackground(GameTheme.SURFACE);
-        JPanel root = GameTheme.background(new BorderLayout(0, 12));
-        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
         String subtitle = entries.isEmpty() ? "Chưa có trận đấu nào." : entries.size() + " trận gần nhất";
-        JLabel title = new JLabel("Lịch sử đấu — " + subtitle);
+        showData(historyView, "Lịch sử đấu — " + subtitle, scroll);
+        selectNavigation(history);
+        cards.show(content, "history");
+    }
+
+    private static void showLoading(JPanel view, String title, String text) {
+        JLabel message = new JLabel(text, JLabel.CENTER);
+        message.setForeground(GameTheme.MUTED);
+        showData(view, title, message);
+    }
+
+    private static void showData(JPanel view, String titleText, java.awt.Component body) {
+        view.removeAll();
+        view.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
+        JLabel title = new JLabel(titleText);
         title.setForeground(GameTheme.ACCENT);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 15f));
-        root.add(title, BorderLayout.NORTH);
-        root.add(scroll, BorderLayout.CENTER);
-        JDialog dialog = new JDialog(this, "Lịch sử đấu", true);
-        dialog.setContentPane(root);
-        dialog.setSize(800, 460);
-        dialog.setLocationRelativeTo(this);
-        dialog.setVisible(true);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 19f));
+        view.add(title, BorderLayout.NORTH);
+        view.add(body, BorderLayout.CENTER);
+        view.revalidate();
+        view.repaint();
     }
 
     private static String translateResult(String result) {

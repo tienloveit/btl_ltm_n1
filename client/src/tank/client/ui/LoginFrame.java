@@ -71,7 +71,7 @@ public final class LoginFrame extends JFrame {
         form.add(Box.createVerticalStrut(24));
         form.add(loginButton);
         form.add(Box.createVerticalStrut(14));
-        messageLabel.setFont(messageLabel.getFont().deriveFont(12f));
+        messageLabel.setFont(messageLabel.getFont().deriveFont(13f));
         messageLabel.setForeground(GameTheme.CYAN);
         messageLabel.setAlignmentX(CENTER_ALIGNMENT);
         form.add(messageLabel);
@@ -105,7 +105,7 @@ public final class LoginFrame extends JFrame {
 
     private static JLabel label(String text, float size, java.awt.Color color) {
         JLabel label = new JLabel(text);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, size));
+        label.setFont(label.getFont().deriveFont(Font.BOLD, size * 1.1f));
         label.setForeground(color);
         return label;
     }

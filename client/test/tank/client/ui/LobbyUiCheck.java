@@ -5,6 +5,8 @@ import tank.client.model.PlayerProfile;
 import tank.client.model.PlayerSummary;
 import tank.client.model.RoomState;
 import tank.client.model.GameState;
+import tank.client.model.RankingEntry;
+import tank.client.model.MatchHistoryEntry;
 import javax.imageio.ImageIO;
 import javax.swing.JButton;
 import javax.swing.JComponent;
@@ -54,6 +56,16 @@ public final class LobbyUiCheck {
                         new PlayerProfile("doanngocquang", 13, 100, 10, 2, 1, "ONLINE"));
                 frame.updatePlayers(roster);
                 capture((JComponent) frame.getContentPane(), "lobby", 960, 560);
+                frame.showRanking(List.of(
+                        new RankingEntry("player_a", 12, 422, 8, 3, 1),
+                        new RankingEntry("player_b", 10, 421, 7, 3, 0)));
+                check(findButton(frame.getContentPane(), "Xếp hạng").isSelected(), "ranking menu is selected");
+                capture((JComponent) frame.getContentPane(), "ranking", 960, 560);
+                frame.showHistory(List.of(new MatchHistoryEntry(7, "2026-10-12 10:30", "player_a", 3, 1, "WIN")));
+                check(findButton(frame.getContentPane(), "Lịch sử đấu").isSelected(), "history menu is selected");
+                capture((JComponent) frame.getContentPane(), "history", 960, 560);
+                findButton(frame.getContentPane(), "Lobby").doClick();
+                check(findButton(frame.getContentPane(), "Lobby").isSelected(), "lobby menu is selected");
                 frame.showPending("challenge-preview", "player_a", 30);
                 capture((JComponent) frame.getContentPane(), "pending", 960, 560);
                 frame.closeChallenge("challenge-preview", "ACCEPTED");

@@ -78,7 +78,7 @@ public final class RegisterFrame extends JFrame {
         content.add(Box.createVerticalStrut(18));
         content.add(signUpButton);
 
-        messageLabel.setFont(messageLabel.getFont().deriveFont(12f));
+        messageLabel.setFont(messageLabel.getFont().deriveFont(13f));
         messageLabel.setForeground(GameTheme.CYAN);
         JPanel footer = new JPanel(new BorderLayout(0, 6));
         footer.setOpaque(false);
@@ -109,7 +109,7 @@ public final class RegisterFrame extends JFrame {
 
     private static JLabel label(String text, float size, java.awt.Color color) {
         JLabel label = new JLabel(text);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, size));
+        label.setFont(label.getFont().deriveFont(Font.BOLD, size * 1.1f));
         label.setForeground(color);
         return label;
     }

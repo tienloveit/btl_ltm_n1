@@ -26,9 +26,9 @@ public final class PlayerInformationPanel extends JPanel {
         JPanel identity = new JPanel(new BorderLayout(0, 5));
         identity.setOpaque(false);
         JLabel caption = new JLabel("PILOT PROFILE");
-        caption.setFont(caption.getFont().deriveFont(Font.BOLD, 11f));
+        caption.setFont(caption.getFont().deriveFont(Font.BOLD, 12f));
         caption.setForeground(GameTheme.ACCENT);
-        usernameValue.setFont(usernameValue.getFont().deriveFont(Font.BOLD, 25f));
+        usernameValue.setFont(usernameValue.getFont().deriveFont(Font.BOLD, 28f));
         usernameValue.setForeground(GameTheme.TEXT);
         identity.add(caption, BorderLayout.NORTH);
         identity.add(usernameValue, BorderLayout.CENTER);
@@ -49,9 +49,9 @@ public final class PlayerInformationPanel extends JPanel {
         JPanel card = GameTheme.card(new BorderLayout(0, 9));
         card.setBorder(BorderFactory.createEmptyBorder(15, 17, 15, 17));
         JLabel title = new JLabel(caption);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 10f));
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 11f));
         title.setForeground(GameTheme.MUTED);
-        value.setFont(value.getFont().deriveFont(Font.BOLD, 23f));
+        value.setFont(value.getFont().deriveFont(Font.BOLD, 25f));
         value.setForeground(accent);
         card.add(title, BorderLayout.NORTH);
         card.add(value, BorderLayout.CENTER);

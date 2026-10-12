@@ -32,13 +32,13 @@ public final class ChallengeDialog extends JDialog {
         root.setBorder(BorderFactory.createEmptyBorder(22, 24, 22, 24));
         JLabel title = new JLabel("LỜI MỜI THÁCH ĐẤU", SwingConstants.CENTER);
         title.setForeground(GameTheme.ACCENT);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 17f));
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 19f));
         root.add(title, BorderLayout.NORTH);
         JPanel message = new JPanel(new GridLayout(3, 1, 0, 6));
         message.setOpaque(false);
         JLabel name = new JLabel(opponent, SwingConstants.CENTER);
         name.setForeground(GameTheme.TEXT);
-        name.setFont(name.getFont().deriveFont(Font.BOLD, 21f));
+        name.setFont(name.getFont().deriveFont(Font.BOLD, 23f));
         JLabel invitation = new JLabel("Muốn đấu với bạn!", SwingConstants.CENTER);
         invitation.setForeground(GameTheme.TEXT);
         note = new JLabel("Lời mời hết hạn sau " + timeoutSeconds + " giây.", SwingConstants.CENTER);

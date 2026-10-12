@@ -80,7 +80,7 @@ public final class WaitingRoomPanel extends JPanel {
     private static JLabel label(String text, java.awt.Color color, int size) {
         JLabel label = new JLabel(text, SwingConstants.CENTER);
         label.setForeground(color);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, (float) size));
+        label.setFont(label.getFont().deriveFont(Font.BOLD, size * 1.1f));
         return label;
     }
 }

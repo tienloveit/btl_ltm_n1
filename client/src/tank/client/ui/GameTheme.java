@@ -41,7 +41,7 @@ final class GameTheme {
     }
 
     static void styleField(JTextComponent field) {
-        field.setFont(field.getFont().deriveFont(15f));
+        field.setFont(field.getFont().deriveFont(17f));
         field.setForeground(TEXT);
         field.setCaretColor(ACCENT);
         field.setSelectionColor(new Color(73, 105, 72));
@@ -59,6 +59,13 @@ final class GameTheme {
         return new GameButton(text, false, new Color(162, 48, 49));
     }
 
+    /** Marks a sidebar navigation item as the active view. */
+    static void setNavigationSelected(JButton button, boolean selected) {
+        button.setSelected(selected);
+        button.setForeground(selected ? BACKGROUND : TEXT);
+        button.repaint();
+    }
+
     static void styleWindow(javax.swing.JFrame frame) {
         frame.getRootPane().setBorder(BorderFactory.createLineBorder(BORDER));
     }
@@ -66,7 +73,7 @@ final class GameTheme {
     static void styleTable(JTable table) {
         table.setBackground(SURFACE);
         table.setForeground(TEXT);
-        table.setFont(table.getFont().deriveFont(13f));
+        table.setFont(table.getFont().deriveFont(14f));
         table.setGridColor(BORDER);
         table.setRowHeight(32);
         table.setSelectionBackground(SURFACE_LIGHT);
@@ -87,7 +94,7 @@ final class GameTheme {
         javax.swing.table.JTableHeader header = table.getTableHeader();
         header.setBackground(new Color(15, 25, 33));
         header.setForeground(ACCENT);
-        header.setFont(header.getFont().deriveFont(java.awt.Font.BOLD, 12f));
+        header.setFont(header.getFont().deriveFont(java.awt.Font.BOLD, 13f));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER));
         // Center-align header labels
         ((javax.swing.table.DefaultTableCellRenderer) header.getDefaultRenderer())
@@ -154,7 +161,7 @@ final class GameTheme {
             super(text);
             this.primary = primary;
             this.customFill = customFill;
-            setFont(getFont().deriveFont(13f).deriveFont(java.awt.Font.BOLD));
+            setFont(getFont().deriveFont(14f).deriveFont(java.awt.Font.BOLD));
             setForeground(primary ? BACKGROUND : TEXT);
             setBorder(BorderFactory.createEmptyBorder(13, 20, 13, 20));
             setFocusPainted(false);
@@ -180,15 +187,15 @@ final class GameTheme {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color fill = primary ? (hovered ? ACCENT_HOVER : ACCENT)
+            Color fill = (primary || isSelected()) ? (hovered ? ACCENT_HOVER : ACCENT)
                     : (hovered ? SURFACE_LIGHT : SURFACE);
             if (customFill != null) { fill = hovered ? customFill.brighter() : customFill; }
-            if (!isEnabled()) {
+            if (!isEnabled() && !isSelected()) {
                 fill = primary ? new Color(105, 136, 74) : SURFACE;
             }
             g.setColor(fill);
             g.fillRoundRect(0, 0, getWidth(), getHeight() - 1, 14, 14);
-            if (!primary) {
+            if (!primary && !isSelected()) {
                 g.setColor(BORDER);
                 g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 2, 14, 14);
             }

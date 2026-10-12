@@ -45,14 +45,14 @@ public final class OnlinePlayersPanel extends JPanel {
         title.setOpaque(false);
         JLabel heading = new JLabel("NGƯỜI CHƠI ONLINE");
         heading.setForeground(GameTheme.TEXT);
-        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 17f));
+        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 19f));
         countLabel.setForeground(GameTheme.ACCENT);
         title.add(heading, BorderLayout.WEST);
         title.add(countLabel, BorderLayout.EAST);
         add(title, BorderLayout.NORTH);
         table.setFillsViewportHeight(true);
         table.setRowHeight(48);
-        table.setFont(table.getFont().deriveFont(14f));
+        table.setFont(table.getFont().deriveFont(15f));
         table.setForeground(GameTheme.TEXT);
         table.setBackground(GameTheme.SURFACE);
         table.setSelectionBackground(GameTheme.SURFACE_LIGHT);
@@ -62,7 +62,7 @@ public final class OnlinePlayersPanel extends JPanel {
         table.getTableHeader().setReorderingAllowed(false);
         table.getTableHeader().setBackground(GameTheme.FIELD);
         table.getTableHeader().setForeground(GameTheme.MUTED);
-        table.getTableHeader().setFont(table.getFont().deriveFont(Font.BOLD, 12f));
+        table.getTableHeader().setFont(table.getFont().deriveFont(Font.BOLD, 13f));
         table.getTableHeader().setPreferredSize(new java.awt.Dimension(0, 42));
         table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
         DefaultTableCellRenderer textRenderer = new DefaultTableCellRenderer() {

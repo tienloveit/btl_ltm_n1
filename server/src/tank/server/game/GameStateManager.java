@@ -23,6 +23,10 @@ public final class GameStateManager implements RoomManager.GameListener {
     private static final int MOVE_STEP = 24;
     private static final int BULLET_STEP = 12;
     private static final int HIT_DAMAGE = 20;
+    // Only the visible central hull is vulnerable, not the entire tank sprite.
+    private static final int TANK_HITBOX_HALF_WIDTH = 28;
+    private static final int TANK_HITBOX_TOP_OFFSET = 5;
+    private static final int TANK_HITBOX_BOTTOM_OFFSET = 36;
     private static final long SHOT_COOLDOWN_NANOS = TimeUnit.MILLISECONDS.toNanos(350);
 
     private final PlayerSessionManager sessions;
@@ -170,7 +174,9 @@ public final class GameStateManager implements RoomManager.GameListener {
 
     private static boolean hit(Bullet bullet, Tank tank) {
         int tankY = tank.bottomPlayer ? 360 : 40;
-        return Math.abs(bullet.x - tank.x) <= 42 && bullet.y >= tankY - 12 && bullet.y <= tankY + 45;
+        return Math.abs(bullet.x - tank.x) <= TANK_HITBOX_HALF_WIDTH
+                && bullet.y >= tankY + TANK_HITBOX_TOP_OFFSET
+                && bullet.y <= tankY + TANK_HITBOX_BOTTOM_OFFSET;
     }
 
     private void finish(Match match, String winner, String reason) {
