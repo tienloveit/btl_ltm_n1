@@ -71,6 +71,39 @@ public final class LobbyUiCheck {
                 frame.showGameOver("12345678-0000-0000-0000-000000000000", "doanngocquang", "Đối thủ đã hết HP.");
                 capture((JComponent) frame.getContentPane(), "game-over", 960, 560);
 
+                frame.setVisible(true);
+                java.awt.Rectangle windowedBounds = frame.getBounds();
+                java.awt.GraphicsDevice screen = frame.getGraphicsConfiguration().getDevice();
+                GamePlayPanel game = find(frame.getContentPane(), GamePlayPanel.class);
+                JButton fullScreen = findButton(game, "Toàn màn hình");
+                check(fullScreen != null && !fullScreen.isFocusable(), "fullscreen button preserves gameplay keyboard input");
+                for (int attempt = 0; attempt < 2; attempt++) {
+                    fullScreen.doClick();
+                    check(frame.isUndecorated() && screen.getFullScreenWindow() == frame,
+                            "game occupies the current screen without window decorations");
+                    check(!findButton(frame.getContentPane(), "Lobby").isShowing(), "lobby menu hidden in fullscreen");
+                    check("Về cửa sổ".equals(fullScreen.getText()), "fullscreen button shows restore action");
+                    if (attempt == 0) {
+                        capture((JComponent) frame.getContentPane(), "gameplay-fullscreen",
+                                frame.getContentPane().getWidth(), frame.getContentPane().getHeight());
+                        fullScreen.doClick();
+                    } else {
+                        Object escape = game.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                                .get(javax.swing.KeyStroke.getKeyStroke("ESCAPE"));
+                        game.getActionMap().get(escape).actionPerformed(
+                                new java.awt.event.ActionEvent(game, 0, "escape"));
+                    }
+                    check(!frame.isUndecorated() && screen.getFullScreenWindow() == null,
+                            "button and Escape release fullscreen");
+                    check(frame.getBounds().equals(windowedBounds), "window size and position restored");
+                    check(findButton(frame.getContentPane(), "Lobby").isShowing(), "lobby layout restored");
+                }
+                fullScreen.doClick();
+                frame.closeRoom("12345678-0000-0000-0000-000000000000", "Đã rời trận.");
+                check(!frame.isUndecorated() && screen.getFullScreenWindow() == null,
+                        "leaving a match restores windowed mode");
+                frame.setVisible(false);
+
                 AtomicInteger accepts = new AtomicInteger(), rejects = new AtomicInteger();
                 dialog = new ChallengeDialog(frame, "doanngocquang", 30, accepts::incrementAndGet, rejects::incrementAndGet);
                 capture((JComponent) dialog.getContentPane(), "invitation", 470, 240);
