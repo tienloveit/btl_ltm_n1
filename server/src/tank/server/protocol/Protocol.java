@@ -16,6 +16,9 @@ public final class Protocol {
     public static final String RANKING_RESPONSE = "RANKING_RESPONSE";
     public static final String HISTORY_REQUEST = "HISTORY_REQUEST";
     public static final String HISTORY_RESPONSE = "HISTORY_RESPONSE";
+    public static final String PLAYER_DETAILS_REQUEST = "PLAYER_DETAILS_REQUEST";
+    public static final String PLAYER_DETAILS_RESPONSE = "PLAYER_DETAILS_RESPONSE";
+    public static final String PLAYER_DETAILS_ERROR = "PLAYER_DETAILS_ERROR";
     public static final String CHALLENGE = "CHALLENGE";
     public static final String CHALLENGE_PENDING = "CHALLENGE_PENDING";
     public static final String CHALLENGE_RECEIVED = "CHALLENGE_RECEIVED";
@@ -23,6 +26,7 @@ public final class Protocol {
     public static final String CHALLENGE_CLOSED = "CHALLENGE_CLOSED";
     public static final String ROOM_STATE = "ROOM_STATE";
     public static final String ROOM_LEAVE = "ROOM_LEAVE";
+    public static final String ROOM_READY = "ROOM_READY";
     public static final String ROOM_CLOSED = "ROOM_CLOSED";
     public static final String LOBBY_ERROR = "LOBBY_ERROR";
     public static final String ACCEPT = "ACCEPT";
@@ -33,6 +37,7 @@ public final class Protocol {
     public static final String SHOOT = "SHOOT";
     public static final String GAME_STATE = "GAME_STATE";
     public static final String GAME_OVER = "GAME_OVER";
+    public static final String MATCH_RESULT = "MATCH_RESULT";
     public static final String HIT_EFFECT = "HIT_EFFECT";
     public static final String PLAY_AGAIN = "PLAY_AGAIN";
     public static final String EXIT = "EXIT";

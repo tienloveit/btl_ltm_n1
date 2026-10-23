@@ -37,7 +37,11 @@ final class GameTheme {
     }
 
     static JPanel card(LayoutManager layout) {
-        return new CardPanel(layout);
+        return new CardPanel(layout, true);
+    }
+
+    static JPanel card(LayoutManager layout, boolean outline) {
+        return new CardPanel(layout, outline);
     }
 
     static void styleField(JTextComponent field) {
@@ -62,7 +66,8 @@ final class GameTheme {
     /** Marks a sidebar navigation item as the active view. */
     static void setNavigationSelected(JButton button, boolean selected) {
         button.setSelected(selected);
-        button.setForeground(selected ? BACKGROUND : TEXT);
+        boolean home = Boolean.TRUE.equals(button.getClientProperty("home-button"));
+        button.setForeground(selected ? (home ? HomeTheme.BACKGROUND : BACKGROUND) : (home ? HomeTheme.TEXT : TEXT));
         button.repaint();
     }
 
@@ -83,7 +88,14 @@ final class GameTheme {
 
         // Center-align all cell content
         javax.swing.table.DefaultTableCellRenderer centerRenderer =
-                new javax.swing.table.DefaultTableCellRenderer();
+                new javax.swing.table.DefaultTableCellRenderer() {
+                    @Override public java.awt.Component getTableCellRendererComponent(JTable source, Object value,
+                            boolean selected, boolean focused, int row, int column) {
+                        super.getTableCellRendererComponent(source, value, selected, focused, row, column);
+                        setToolTipText(value == null ? null : value.toString());
+                        return this;
+                    }
+                };
         centerRenderer.setHorizontalAlignment(JLabel.CENTER);
         centerRenderer.setBackground(SURFACE);
         centerRenderer.setForeground(TEXT);
@@ -109,6 +121,11 @@ final class GameTheme {
 
         @Override
         protected void paintComponent(Graphics graphics) {
+            if (Boolean.TRUE.equals(getClientProperty("home-background"))) {
+                HomeTheme.backdrop(graphics, getWidth(), getHeight());
+                super.paintComponent(graphics);
+                return;
+            }
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setPaint(new GradientPaint(0, 0, BACKGROUND, getWidth(), getHeight(), BACKGROUND_END));
@@ -128,8 +145,11 @@ final class GameTheme {
     }
 
     private static final class CardPanel extends JPanel {
-        private CardPanel(LayoutManager layout) {
+        private final boolean outline;
+
+        private CardPanel(LayoutManager layout, boolean outline) {
             super(layout);
+            this.outline = outline;
             setOpaque(false);
         }
 
@@ -141,8 +161,10 @@ final class GameTheme {
             g.fillRoundRect(5, 7, getWidth() - 10, getHeight() - 10, 24, 24);
             g.setColor(SURFACE);
             g.fillRoundRect(1, 1, getWidth() - 8, getHeight() - 9, 24, 24);
-            g.setColor(BORDER);
-            g.drawRoundRect(1, 1, getWidth() - 9, getHeight() - 10, 24, 24);
+            if (outline) {
+                g.setColor(BORDER);
+                g.drawRoundRect(1, 1, getWidth() - 9, getHeight() - 10, 24, 24);
+            }
             g.dispose();
             super.paintComponent(graphics);
         }
@@ -187,16 +209,18 @@ final class GameTheme {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            Color fill = (primary || isSelected()) ? (hovered ? ACCENT_HOVER : ACCENT)
-                    : (hovered ? SURFACE_LIGHT : SURFACE);
+            boolean home = Boolean.TRUE.equals(getClientProperty("home-button"));
+            Color accent = home ? HomeTheme.LIME : ACCENT;
+            Color fill = (primary || isSelected()) ? (hovered ? (home ? accent.brighter() : ACCENT_HOVER) : accent)
+                    : (hovered ? (home ? HomeTheme.RAISED : SURFACE_LIGHT) : (home ? HomeTheme.PANEL : SURFACE));
             if (customFill != null) { fill = hovered ? customFill.brighter() : customFill; }
             if (!isEnabled() && !isSelected()) {
-                fill = primary ? new Color(105, 136, 74) : SURFACE;
+                fill = home ? HomeTheme.ALT : primary ? new Color(105, 136, 74) : SURFACE;
             }
             g.setColor(fill);
             g.fillRoundRect(0, 0, getWidth(), getHeight() - 1, 14, 14);
             if (!primary && !isSelected()) {
-                g.setColor(BORDER);
+                g.setColor(home ? HomeTheme.EDGE : BORDER);
                 g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 2, 14, 14);
             }
             g.dispose();

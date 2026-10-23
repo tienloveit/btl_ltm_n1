@@ -23,7 +23,9 @@ public final class RoomManager {
 
     private static final class Room {
         final RoomInfo info;
-        int seconds = 3;
+        int seconds = 10;
+        boolean player1Ready;
+        boolean player2Ready;
         boolean started;
         ScheduledFuture<?> countdown;
 
@@ -101,6 +103,27 @@ public final class RoomManager {
         }
     }
 
+    /** Records a player's one-way ready signal and shortens the countdown once both are ready. */
+    public void ready(String username, String roomId) {
+        synchronized (sessions) {
+            Room room = rooms.get(roomId);
+            if (room == null || !roomId.equals(roomByPlayer.get(username))) {
+                sessions.sendTo(username, Protocol.LOBBY_ERROR, "Bạn không ở trong phòng này.");
+                return;
+            }
+            if (room.started) {
+                sessions.sendTo(username, Protocol.LOBBY_ERROR, "Trận đấu đã bắt đầu.");
+                return;
+            }
+            if (room.info.player1().equals(username)) { room.player1Ready = true; }
+            else if (room.info.player2().equals(username)) { room.player2Ready = true; }
+            if (room.player1Ready && room.player2Ready) {
+                room.seconds = Math.min(room.seconds, 3);
+            }
+            broadcastState(room);
+        }
+    }
+
     public void onDisconnect(String username) {
         synchronized (sessions) {
             Room room = rooms.get(roomByPlayer.get(username));
@@ -130,7 +153,8 @@ public final class RoomManager {
 
     private void broadcastState(Room room) {
         sendBoth(room, Protocol.ROOM_STATE, room.info.roomId(), room.info.player1(),
-                room.info.player2(), Integer.toString(room.seconds));
+                room.info.player2(), Integer.toString(room.seconds),
+                Boolean.toString(room.player1Ready), Boolean.toString(room.player2Ready));
     }
 
     private void sendBoth(Room room, String type, String... values) {

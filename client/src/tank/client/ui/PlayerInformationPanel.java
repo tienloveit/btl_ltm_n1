@@ -30,6 +30,8 @@ public final class PlayerInformationPanel extends JPanel {
         caption.setForeground(GameTheme.ACCENT);
         usernameValue.setFont(usernameValue.getFont().deriveFont(Font.BOLD, 28f));
         usernameValue.setForeground(GameTheme.TEXT);
+        caption.setHorizontalAlignment(JLabel.CENTER);
+        usernameValue.setHorizontalAlignment(JLabel.CENTER);
         identity.add(caption, BorderLayout.NORTH);
         identity.add(usernameValue, BorderLayout.CENTER);
 
@@ -53,6 +55,8 @@ public final class PlayerInformationPanel extends JPanel {
         title.setForeground(GameTheme.MUTED);
         value.setFont(value.getFont().deriveFont(Font.BOLD, 25f));
         value.setForeground(accent);
+        title.setHorizontalAlignment(JLabel.CENTER);
+        value.setHorizontalAlignment(JLabel.CENTER);
         card.add(title, BorderLayout.NORTH);
         card.add(value, BorderLayout.CENTER);
         return card;

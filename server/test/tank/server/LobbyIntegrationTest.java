@@ -1,6 +1,8 @@
 package tank.server;
 
 import tank.client.model.PlayerProfile;
+import tank.client.model.PlayerDetails;
+import tank.server.persistence.MatchHistoryRecord;
 import tank.client.model.PlayerSummary;
 import tank.client.model.RoomState;
 import tank.client.network.ClientConnection;
@@ -38,6 +40,7 @@ public final class LobbyIntegrationTest {
     private static int checks;
 
     public static void main(String[] args) throws Exception {
+        checks += tank.server.game.GameGeometryCheck.run();
         try (Fixture server = new Fixture();
                 Probe alice = server.login("alice");
                 Probe bob = server.login("bob");
@@ -47,6 +50,34 @@ public final class LobbyIntegrationTest {
             check("ONLINE".equals(alice.profile.getStatus()), "login profile");
             check(server.sessions.getStatus("alice").name().equals("ONLINE"), "online status");
 
+            alice.connection.requestPlayerDetails("bob");
+            alice.await(0, "DETAILS", event -> event.values.get(0).equals("bob"));
+            check(alice.details.history().size() == 1
+                            && alice.details.history().get(0).opponent().equals("alice")
+                            && alice.details.history().get(0).playerScore() == 2
+                            && alice.details.history().get(0).result().equals("WIN"),
+                    "other player's history has the selected player's perspective");
+            int detailsMark = alice.mark();
+            alice.connection.requestPlayerDetails("OFFLINE_USER");
+            alice.await(detailsMark, "DETAILS", event -> event.values.get(0).equals("offline_user"));
+            check(alice.details.profile().getStatus().equals("OFFLINE") && alice.details.history().isEmpty(),
+                    "offline player details and empty history are supported");
+            detailsMark = alice.mark();
+            alice.connection.requestPlayerDetails("does_not_exist");
+            alice.await(detailsMark, "DETAILS_ERROR", event -> event.values.get(0).equals("does_not_exist"));
+            detailsMark = alice.mark();
+            alice.connection.requestPlayerDetails("bad name!");
+            alice.await(detailsMark, "DETAILS_ERROR");
+            server.failHistory = true;
+            try {
+                detailsMark = alice.mark();
+                alice.connection.requestPlayerDetails("bob");
+                alice.await(detailsMark, "DETAILS_ERROR", event -> event.values.get(0).equals("bob"));
+            } finally { server.failHistory = false; }
+            detailsMark = alice.mark();
+            alice.connection.requestPlayerDetails("bob");
+            alice.await(detailsMark, "DETAILS");
+
             int mark = alice.mark();
             alice.connection.challenge("alice");
             alice.await(mark, "ERROR");
@@ -55,6 +86,8 @@ public final class LobbyIntegrationTest {
             alice.await(mark, "ERROR");
 
             try (Probe guest = new Probe(server.port())) {
+                guest.connection.requestPlayerDetails("alice");
+                guest.await(0, "DETAILS_ERROR", event -> event.values.get(0).equals("alice"));
                 mark = guest.mark();
                 guest.connection.challenge("alice");
                 guest.await(mark, "ERROR");
@@ -127,6 +160,8 @@ public final class LobbyIntegrationTest {
             RoomState firstRoom = room(alice.await(aStart, "ROOM"));
             RoomState otherRoom = room(bob.await(bStart, "ROOM"));
             check(firstRoom.equals(otherRoom), "same room and initial countdown");
+            check(firstRoom.secondsRemaining() == 10
+                    && !firstRoom.player1Ready() && !firstRoom.player2Ready(), "new room starts at 10 with nobody ready");
             check(firstRoom.player1().equals("alice") && firstRoom.player2().equals("bob"), "player slots");
             mark = bob.mark();
             bob.connection.acceptChallenge(id);
@@ -134,10 +169,14 @@ public final class LobbyIntegrationTest {
             mark = carol.mark();
             carol.connection.leaveRoom(firstRoom.roomId());
             carol.await(mark, "ERROR");
+            mark = carol.mark();
+            carol.connection.readyRoom(firstRoom.roomId());
+            carol.await(mark, "ERROR");
             alice.await(aStart, "START", event -> event.values.get(0).equals(firstRoom.roomId()));
             bob.await(bStart, "START", event -> event.values.get(0).equals(firstRoom.roomId()));
             check(alice.count(aStart, "START") == 1 && bob.count(bStart, "START") == 1, "single MATCH_START");
-            check(alice.countdown(aStart).equals(List.of("3", "2", "1")), "server countdown 3-2-1");
+            check(alice.countdown(aStart).equals(List.of("10", "9", "8", "7", "6", "5", "4", "3", "2", "1")),
+                    "room starts automatically after the 10-second countdown when neither player is ready");
             check(alice.countdown(aStart).equals(bob.countdown(bStart)), "matching countdowns");
             check(server.starts.get() == 1, "gameplay start callback");
             check(server.sessions.getStatus("bob").name().equals("PLAYING"), "playing status");
@@ -147,6 +186,53 @@ public final class LobbyIntegrationTest {
             awaitOnline(alice, bob);
             check(server.leaves.get() == 1, "active-room exit callback");
             server.rooms.finishRoom(firstRoom.roomId(), "duplicate finish");
+
+            // Ready signals are sticky; the second player shortens the active countdown
+            // to 3 seconds, and duplicate signals do not reset it.
+            id = invite(alice, bob);
+            aStart = alice.mark();
+            bStart = bob.mark();
+            bob.connection.acceptChallenge(id);
+            RoomState readyRoom = room(alice.await(aStart, "ROOM"));
+            check(readyRoom.secondsRemaining() == 10 && !readyRoom.player1Ready() && !readyRoom.player2Ready(),
+                    "ready room starts at 10 seconds");
+            int carolReady = carol.mark();
+            carol.connection.readyRoom(readyRoom.roomId());
+            carol.await(carolReady, "ERROR");
+
+            int bobReady = bob.mark(), aliceReady = alice.mark();
+            bob.connection.readyRoom(readyRoom.roomId());
+            Event firstReady = alice.await(aliceReady, "ROOM", event -> event.values.get(5).equals("true"));
+            bob.await(bobReady, "ROOM", event -> event.values.get(5).equals("true"));
+            check(firstReady.values.get(3).equals("10") && firstReady.values.get(4).equals("false"),
+                    "one ready signal updates both clients without shortening the countdown");
+
+            alice.await(aliceReady, "ROOM", event -> event.values.get(3).equals("9"));
+            int duplicateReady = alice.mark();
+            bob.connection.readyRoom(readyRoom.roomId());
+            Event duplicate = alice.await(duplicateReady, "ROOM", event -> Integer.parseInt(event.values.get(3)) <= 9
+                    && event.values.get(5).equals("true"));
+            check(Integer.parseInt(duplicate.values.get(3)) <= 9,
+                    "duplicate ready request does not restart the countdown");
+            int bothReadyAt = alice.mark(), bothReadyAtBob = bob.mark();
+            alice.connection.readyRoom(readyRoom.roomId());
+            Event bothReady = alice.await(bothReadyAt, "ROOM", event -> event.values.get(3).equals("3")
+                    && event.values.get(4).equals("true") && event.values.get(5).equals("true"));
+            bob.await(bothReadyAtBob, "ROOM", event -> event.values.get(3).equals("3")
+                    && event.values.get(4).equals("true") && event.values.get(5).equals("true"));
+            check(bothReady.values.get(4).equals("true"), "both-ready countdown jumps immediately to 3");
+            alice.await(aStart, "START", event -> event.values.get(0).equals(readyRoom.roomId()));
+            bob.await(bStart, "START", event -> event.values.get(0).equals(readyRoom.roomId()));
+            List<String> readyCountdown = alice.countdown(aStart);
+            check(readyCountdown.subList(readyCountdown.size() - 3, readyCountdown.size())
+                    .equals(List.of("3", "2", "1")), "both-ready countdown starts after 3-2-1");
+            check(alice.countdown(aStart).equals(bob.countdown(bStart)), "matching both-ready countdowns");
+            check(server.starts.get() == 2, "both automatic and ready countdowns start a match");
+            mark = alice.mark();
+            alice.connection.leaveRoom(readyRoom.roomId());
+            alice.await(mark, "ROOM_CLOSED");
+            awaitOnline(alice, bob);
+            check(server.leaves.get() == 2, "ready-room exit callback");
 
             // Leaving during countdown cancels the scheduled start.
             id = invite(alice, bob);
@@ -193,7 +279,7 @@ public final class LobbyIntegrationTest {
             // Give the cancelled countdown enough time to have fired if cancellation were
             // broken.
             bob.assertAbsent(bob.mark(), "START", event -> event.values.get(0).equals(cancelledRoom.roomId()), 3300);
-            check(server.starts.get() == 1, "cancelled/disconnected rooms never start");
+            check(server.starts.get() == 2, "cancelled/disconnected rooms never start");
 
             // Existing register and logout paths still use the same
             // framing/acknowledgement.
@@ -233,7 +319,8 @@ public final class LobbyIntegrationTest {
 
     private static RoomState room(Event event) {
         return new RoomState(event.values.get(0), event.values.get(1), event.values.get(2),
-                Integer.parseInt(event.values.get(3)));
+                Integer.parseInt(event.values.get(3)), Boolean.parseBoolean(event.values.get(4)),
+                Boolean.parseBoolean(event.values.get(5)));
     }
 
     private static void check(boolean condition, String label) {
@@ -250,6 +337,7 @@ public final class LobbyIntegrationTest {
         final ClientConnection connection = new ClientConnection(this);
         final List<Event> events = new ArrayList<>();
         volatile PlayerProfile profile;
+        volatile PlayerDetails details;
         String username;
         List<String> latestRoster = List.of();
 
@@ -271,7 +359,7 @@ public final class LobbyIntegrationTest {
         }
 
         synchronized Event await(int start, String type, Predicate<Event> predicate) throws Exception {
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
             while (true) {
                 for (int i = start; i < events.size(); i++) {
                     Event event = events.get(i);
@@ -327,6 +415,15 @@ public final class LobbyIntegrationTest {
             add("LOGIN_OK");
         }
 
+        @Override public void onPlayerDetails(PlayerDetails value) {
+            details = value;
+            add("DETAILS", value.profile().getUsername(), value.profile().getStatus());
+        }
+
+        @Override public void onPlayerDetailsError(String target, String reason) {
+            add("DETAILS_ERROR", target, reason);
+        }
+
         @Override
         public void onLoginFailure(String reason) {
             add("LOGIN_FAIL", reason);
@@ -371,7 +468,8 @@ public final class LobbyIntegrationTest {
 
         @Override
         public void onRoomState(RoomState room) {
-            add("ROOM", room.roomId(), room.player1(), room.player2(), Integer.toString(room.secondsRemaining()));
+            add("ROOM", room.roomId(), room.player1(), room.player2(), Integer.toString(room.secondsRemaining()),
+                    Boolean.toString(room.player1Ready()), Boolean.toString(room.player2Ready()));
         }
 
         @Override
@@ -438,6 +536,7 @@ public final class LobbyIntegrationTest {
         final ExecutorService workers = Executors.newCachedThreadPool();
         final List<Socket> sockets = new CopyOnWriteArrayList<>();
         final AtomicInteger starts = new AtomicInteger(), leaves = new AtomicInteger();
+        volatile boolean failHistory;
 
         Fixture() throws Exception {
             clock.setRemoveOnCancelPolicy(true);
@@ -453,7 +552,7 @@ public final class LobbyIntegrationTest {
                     leaves.incrementAndGet();
                 }
             });
-            for (String name : List.of("alice", "bob", "carol")) {
+            for (String name : List.of("alice", "bob", "carol", "offline_user")) {
                 check(accounts.register(name, name + "@example.test", PASSWORD.toCharArray()) == null, "seed account");
             }
             workers.execute(() -> {
@@ -461,7 +560,13 @@ public final class LobbyIntegrationTest {
                     while (!listener.isClosed()) {
                         Socket socket = listener.accept();
                         sockets.add(socket);
-                        workers.execute(new ClientHandler(socket, accounts, sessions, challenges, rooms));
+                        workers.execute(new ClientHandler(socket, accounts, sessions, challenges, rooms, null,
+                                (username, limit) -> {
+                                    if (failHistory) { throw new java.sql.SQLException("simulated query error"); }
+                                    if (limit != 100) { throw new AssertionError("history must be bounded to 100"); }
+                                    return username.equals("bob") ? List.of(new MatchHistoryRecord(
+                                            7, "23/10/2026 10:30", "alice", 2, 1, "WIN")) : List.of();
+                                }));
                     }
                 } catch (IOException exception) {
                     if (!listener.isClosed()) {
