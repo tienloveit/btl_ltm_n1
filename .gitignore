@@ -6,3 +6,4 @@ client/package-check/
 server/package-check/
 server/lib/*.jar
 server/.env
+server/database/backups/

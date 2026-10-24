@@ -21,17 +21,18 @@ public final class MatchHistoryRepository implements MatchHistoryReader, MatchHi
     public void record(String player1, int player1Score, String player2, int player2Score, String winner)
             throws SQLException {
         boolean draw = "DRAW".equals(winner);
-        String loser = draw ? null : (winner.equals(player1) ? player2 : player1);
+        if (player1 == null || player2 == null || player1.equalsIgnoreCase(player2)
+                || player1Score < 0 || player2Score < 0
+                || (!draw && !player1.equals(winner) && !player2.equals(winner))) {
+            throw new IllegalArgumentException("A match requires two distinct players, valid scores and a valid winner.");
+        }
         try (Connection connection = databaseConfig.openConnection()) {
             connection.setAutoCommit(false);
             try {
                 long matchId;
                 try (PreparedStatement statement = connection.prepareStatement(
-                        "INSERT INTO matches (ended_at, status, winner_username, loser_username, is_draw) "
-                                + "VALUES (CURRENT_TIMESTAMP, 'COMPLETED', ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)) {
-                    statement.setString(1, draw ? null : winner);
-                    statement.setString(2, loser);
-                    statement.setBoolean(3, draw);
+                        "INSERT INTO matches (ended_at, status) "
+                                + "VALUES (CURRENT_TIMESTAMP, 'COMPLETED')", Statement.RETURN_GENERATED_KEYS)) {
                     statement.executeUpdate();
                     try (ResultSet keys = statement.getGeneratedKeys()) {
                         if (!keys.next()) { throw new SQLException("Không tạo được mã lịch sử trận đấu."); }

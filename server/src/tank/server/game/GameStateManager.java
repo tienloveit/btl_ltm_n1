@@ -240,23 +240,25 @@ public final class GameStateManager implements RoomManager.GameListener {
         int player1Total = -1;
         int player2Total = -1;
         try {
-            AccountService.Account p1 = accounts.recordResult(match.player1.username, winner.equals(match.player1.username), draw);
+            // Persist once, atomically, before publishing any new profile totals.
+            history.record(match.player1.username, match.player1.score, match.player2.username, match.player2.score, winner);
+        } catch (java.sql.SQLException exception) {
+            System.err.println("Could not persist match result: " + exception.getMessage());
+            return new MatchResultStats(player1Points, -1, player2Points, -1);
+        }
+        try {
+            AccountService.Account p1 = accounts.findAccount(match.player1.username);
             sessions.updateStatistics(p1.username(), p1.matchesPlayed(), p1.score(), p1.wins(), p1.losses(), p1.draws());
             player1Total = p1.score();
         } catch (java.sql.SQLException exception) {
-            System.err.println("Không lưu được thống kê trận đấu cho " + match.player1.username + ": " + exception.getMessage());
+            System.err.println("Could not refresh player statistics: " + exception.getMessage());
         }
         try {
-            AccountService.Account p2 = accounts.recordResult(match.player2.username, winner.equals(match.player2.username), draw);
+            AccountService.Account p2 = accounts.findAccount(match.player2.username);
             sessions.updateStatistics(p2.username(), p2.matchesPlayed(), p2.score(), p2.wins(), p2.losses(), p2.draws());
             player2Total = p2.score();
         } catch (java.sql.SQLException exception) {
-            System.err.println("Không lưu được thống kê trận đấu cho " + match.player2.username + ": " + exception.getMessage());
-        }
-        try {
-            history.record(match.player1.username, match.player1.score, match.player2.username, match.player2.score, winner);
-        } catch (java.sql.SQLException exception) {
-            System.err.println("Không lưu được lịch sử trận đấu: " + exception.getMessage());
+            System.err.println("Could not refresh player statistics: " + exception.getMessage());
         }
         return new MatchResultStats(player1Points, player1Total, player2Points, player2Total);
     }

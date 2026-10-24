@@ -74,18 +74,12 @@ public final class AccountService {
             record.wins(), record.losses(), record.draws());
     }
 
-    public Account recordResult(String username, boolean win, boolean draw) throws SQLException {
+    /** Read the profile after the match writer has committed both participants. */
+    public Account findAccount(String username) throws SQLException {
         AccountRecord record = repository.findByUsername(username)
-                .orElseThrow(() -> new SQLException("Không tìm thấy tài khoản người chơi."));
-        int score = record.score() + pointsForResult(win, draw);
-        int wins = record.wins() + (win ? 1 : 0);
-        int losses = record.losses() + (!win && !draw ? 1 : 0);
-        int draws = record.draws() + (draw ? 1 : 0);
-        int played = record.matchesPlayed() + 1;
-        if (!repository.updateStatistics(username, played, score, wins, losses, draws)) {
-            throw new SQLException("Không thể cập nhật thống kê người chơi.");
-        }
-        return new Account(record.username(), record.email(), played, score, wins, losses, draws);
+                .orElseThrow(() -> new SQLException("Player account not found."));
+        return new Account(record.username(), record.email(), record.matchesPlayed(), record.score(),
+                record.wins(), record.losses(), record.draws());
     }
 
     /** Ranking points awarded for a completed match. */

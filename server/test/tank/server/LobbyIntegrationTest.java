@@ -601,7 +601,8 @@ public final class LobbyIntegrationTest {
         final ScheduledThreadPoolExecutor clock = new ScheduledThreadPoolExecutor(1);
         final RoomManager rooms = new RoomManager(sessions, clock);
         final ChallengeManager challenges = new ChallengeManager(sessions, rooms, clock, 2);
-        final AccountService accounts = new AccountService(new MemoryAccounts());
+        final MemoryAccounts repository = new MemoryAccounts();
+        final AccountService accounts = new AccountService(repository);
         final ServerSocket listener = new ServerSocket(0);
         final ExecutorService workers = Executors.newCachedThreadPool();
         final List<Socket> sockets = new CopyOnWriteArrayList<>();
@@ -616,7 +617,11 @@ public final class LobbyIntegrationTest {
 
         Fixture(boolean gameplay) throws Exception {
             games = gameplay ? new GameStateManager(sessions, rooms, clock, accounts,
-                    (p1, s1, p2, s2, winner) -> recordedMatches.incrementAndGet()) : null;
+                    (p1, s1, p2, s2, winner) -> {
+                        repository.record(p1, winner.equals(p1), "DRAW".equals(winner));
+                        repository.record(p2, winner.equals(p2), "DRAW".equals(winner));
+                        recordedMatches.incrementAndGet();
+                    }) : null;
             clock.setRemoveOnCancelPolicy(true);
             sessions.setDisconnectListener(challenges::onDisconnect);
             rooms.setGameListener(new RoomManager.GameListener() {
@@ -700,10 +705,12 @@ public final class LobbyIntegrationTest {
             return Optional.ofNullable(records.get(name));
         }
 
-        @Override
-        public boolean updateStatistics(String name, int played, int score, int wins, int losses, int draws) {
-            return records.computeIfPresent(name, (key, old) -> new AccountRecord(name, old.email(), old.passwordSalt(),
-                    old.passwordHash(), played, score, wins, losses, draws)) != null;
+        void record(String name, boolean win, boolean draw) {
+            records.computeIfPresent(name, (key, old) -> new AccountRecord(name, old.email(), old.passwordSalt(),
+                    old.passwordHash(), old.matchesPlayed() + 1,
+                    old.score() + AccountService.pointsForResult(win, draw),
+                    old.wins() + (win ? 1 : 0), old.losses() + (!win && !draw ? 1 : 0),
+                    old.draws() + (draw ? 1 : 0)));
         }
 
         @Override

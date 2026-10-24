@@ -14,6 +14,4 @@ public interface AccountRepository {
 
     List<RankingRecord> listRanking(int limit) throws SQLException;
 
-    boolean updateStatistics(String username, int matchesPlayed, int score, int wins, int losses, int draws)
-            throws SQLException;
 }

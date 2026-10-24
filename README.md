@@ -46,6 +46,7 @@ Neu da co database theo schema cu, chay migration nang cap (co the chay lai an t
 
 ```powershell
 mysql -u root -p -e "source server/database/migrate_player_profile.sql"
+mysql -u root -p -e "source server/database/migrate_3nf.sql"
 ```
 
 Tao user rieng cho ung dung, khong dung root de chay game:
@@ -63,7 +64,11 @@ TANK_DB_USER=tank_app
 TANK_DB_PASSWORD=mat-khau-da-tao-o-mysql
 ```
 
-Bảng `player_accounts` lưu username, email, hash mật khẩu và các thống kê `matches_played`, `score`, `wins`, `losses`, `draws` để phục vụ Player Information và Online Player. `auth/AccountService` validate username/email và xử lý PBKDF2-HMAC-SHA256; `persistence/JdbcAccountRepository` dùng prepared statements, đọc hồ sơ và có thao tác cập nhật thống kê sau khi module trận đấu ghi kết quả. Khi nâng từ schema cũ, migration thêm email ở dạng nullable để giữ tài khoản cũ chưa có email; tài khoản đăng ký mới bắt buộc email và email phải duy nhất.
+CSDL theo 3NF gồm ba bảng: `player_accounts` lưu thông tin tài khoản, `matches` lưu thời gian/trạng thái trận, `match_players` lưu điểm trong trận và kết quả WIN/LOSS/DRAW của mỗi người tham gia. Hồ sơ và xếp hạng được tổng hợp từ các trận COMPLETED (thắng 3 điểm xếp hạng, hòa 1, thua 0). Điểm trong trận khác với điểm xếp hạng. Trận và cả hai người tham gia được ghi trong cùng một transaction trước khi cập nhật hồ sơ trên client.
+
+Với database cũ, dừng mọi game server và sao lưu đầy đủ bằng `mysqldump` trước khi chạy `migrate_3nf.sql` bằng tài khoản quản trị. Migration dừng trước khi bỏ cột nếu thống kê hoặc kết quả cũ lệch lịch sử; cần đối soát dữ liệu trước. MySQL DDL tự commit, vì vậy cần bản sao lưu để khôi phục khi có sự cố. Có thể chạy lại migration sau khi thành công. `schema.sql` dùng cho cài mới; CREATE TABLE IF NOT EXISTS không nâng cấp bảng đã tồn tại. Tài khoản cũ có thể giữ email NULL; đăng ký mới yêu cầu email duy nhất.
+
+Kiểm thử JDBC: tạo một database thử nghiệm riêng có tên kết thúc bằng `_3nf_test`, áp dụng `schema.sql` vào database đó, rồi đặt `TANK_DB_URL` trỏ tới database thử nghiệm và chạy `tank.server.DatabaseNormalizationTest` với classpath `server/test-out` và MySQL Connector/J. Không dùng database thật cho kiểm thử này. Bộ kiểm thử kiểm tra thống kê, xếp hạng, lịch sử, CHECK và rollback khi ghi trận lỗi.
 
 Trạng thái kết nối `ONLINE`/`WAITING`/`PLAYING` được giữ trong session RAM, không lưu MySQL. `ONLINE` là rảnh; `WAITING` là đang có lời mời hoặc phòng chờ; `PLAYING` là đã bắt đầu trận. Người chơi offline được loại khỏi roster. Các số liệu trận/điểm mới là dữ liệu lâu dài nên lưu trong MySQL.
 

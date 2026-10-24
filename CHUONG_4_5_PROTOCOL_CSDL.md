@@ -47,7 +47,7 @@ CHƯƠNG 5. THIẾT KẾ VÀ CÀI ĐẶT CƠ SỞ DỮ LIỆU
 5.1. Công nghệ và cấu hình kết nối
 Server sử dụng MySQL thông qua JDBC và MySQL Connector/J. Thông tin kết nối được lấy từ các thiết lập TANK_DB_URL, TANK_DB_USER và TANK_DB_PASSWORD; giá trị môi trường hệ điều hành được ưu tiên hơn file .env. Mật khẩu kết nối không được ghi vào mã nguồn. Cơ sở dữ liệu mặc định có tên tank_game.
 5.2. Mô hình dữ liệu
-Cơ sở dữ liệu gồm ba bảng chính: player_accounts lưu tài khoản và thống kê; matches lưu thông tin chung của trận; match_players lưu kết quả từng người trong trận.
+Cơ sở dữ liệu gồm ba bảng chính theo 3NF: player_accounts lưu thông tin tài khoản; matches lưu thông tin chung của trận; match_players lưu kết quả từng người trong trận. Thống kê được tổng hợp khi truy vấn, không lưu lặp trong bảng tài khoản.
 Bảng player_accounts
 Trường | Ý nghĩa
 --- | ---
@@ -56,9 +56,6 @@ display_name | Tên hiển thị
 email | Email; duy nhất. Bắt buộc trong schema cài mới, có thể NULL với tài khoản cũ sau migration
 password_salt | Salt ngẫu nhiên 16 byte
 password_hash | Giá trị băm mật khẩu 32 byte
-matches_played | Tổng số trận
-score | Tổng điểm xếp hạng
-wins, losses, draws | Số trận thắng, thua và hòa
 created_at | Thời điểm tạo tài khoản
 Bảng matches
 Trường | Ý nghĩa
@@ -67,9 +64,6 @@ match_id | Khóa chính tự tăng
 started_at | Thời điểm tạo bản ghi trận
 ended_at | Thời điểm kết thúc được ghi nhận
 status | Trạng thái bản ghi, mặc định COMPLETED
-winner_username | Tài khoản thắng, tham chiếu player_accounts; NULL nếu hòa
-loser_username | Tài khoản thua, tham chiếu player_accounts; NULL nếu hòa
-is_draw | Đánh dấu trận hòa
 Bảng match_players
 Trường | Ý nghĩa
 --- | ---
@@ -77,12 +71,16 @@ match_id | Khóa ngoại tới matches
 username | Khóa ngoại tới player_accounts
 score | Điểm ghi nhận cho người chơi trong trận
 result | Kết quả của người chơi: WIN, LOSS hoặc DRAW
-Khóa chính ghép của match_players là match_id và username, bảo đảm một tài khoản chỉ có một bản ghi tham gia cho mỗi trận. Các khóa ngoại liên kết trận với người thắng/thua và các người tham gia. Bảng player_accounts có chỉ mục duy nhất cho email.
-Hình 5.1 — ERD cần thể hiện player_accounts liên kết với matches qua vai trò winner/loser, và liên kết với match_players; mỗi trận có các bản ghi người tham gia trong match_players. Ghi rõ khóa chính, khóa ngoại và ràng buộc email duy nhất.
+Khóa chính ghép của match_players là match_id và username, bảo đảm một tài khoản chỉ có một bản ghi tham gia cho mỗi trận. Hai khóa ngoại tham chiếu matches và player_accounts. Bảng player_accounts có chỉ mục duy nhất cho email. CHECK giới hạn score không âm và result thuộc WIN/LOSS/DRAW. Repository kiểm tra hai người chơi khác nhau và người thắng hợp lệ trước khi ghi.
+Hình 5.1 — ERD thể hiện player_accounts (1) — (N) match_players (N) — (1) matches. Ghi rõ khóa chính, khóa ngoại và ràng buộc email duy nhất.
+
+Với các phụ thuộc nghiệp vụ hiện tại, mỗi thuộc tính không khóa của player_accounts phụ thuộc vào username; các thuộc tính thời gian/trạng thái của matches phụ thuộc vào match_id; score và result của match_players phụ thuộc vào toàn bộ khóa (match_id, username). Không lưu matches_played = wins + losses + draws hoặc điểm xếp hạng = 3 × wins + draws trong tài khoản để tránh phụ thuộc giữa các thuộc tính không khóa.
 5.3. Bảo vệ tài khoản và truy cập dữ liệu
 Khi đăng ký, Server chuẩn hóa username/email, kiểm tra định dạng và độ dài mật khẩu, tạo salt ngẫu nhiên rồi băm bằng PBKDF2-HMAC-SHA256 với 120.000 vòng lặp và khóa 256 bit. Khi đăng nhập, Server tính lại hash từ mật khẩu nhập vào và salt đã lưu, sau đó so sánh an toàn với hash trong cơ sở dữ liệu. Mật khẩu gốc không được lưu trong bảng.
 Các thao tác truy vấn và cập nhật tài khoản dùng PreparedStatement. Tài khoản hoặc email trùng được xử lý thành lỗi đăng ký phù hợp. Cấu hình Database được đọc từ biến môi trường hoặc file .env ở phía Server.
 5.4. Ghi thống kê, lịch sử và truy vấn
-Khi trận kết thúc, AccountService cập nhật tổng số trận, điểm, thắng, thua hoặc hòa cho từng người. Điểm được cộng theo luật: thắng +3, hòa +1, thua +0. PlayerSessionManager cập nhật hồ sơ trong session trực tuyến và phát PROFILE_UPDATE/PLAYER_LIST.
+Khi trận kết thúc, server ghi lịch sử thành công trước rồi đọc lại hồ sơ. JdbcAccountRepository tổng hợp các bản ghi match_players thuộc trận COMPLETED để tính số trận, thắng/thua/hòa và điểm xếp hạng (thắng 3, hòa 1, thua 0). PlayerSessionManager cập nhật hồ sơ trong session trực tuyến và phát PROFILE_UPDATE/PLAYER_LIST. Điểm xếp hạng không phải tổng score trong trận.
 MatchHistoryRepository tạo bản ghi trong matches, lấy match_id vừa sinh, sau đó ghi hai người chơi vào match_players trong cùng một transaction. Khi một thao tác lưu các bảng lịch sử gặp lỗi, transaction bị rollback. Truy vấn history lọc theo người chơi, ghép với đối thủ và trả tối đa 100 bản ghi gần nhất.
-Truy vấn ranking sắp xếp theo score giảm dần, wins giảm dần, draws giảm dần, losses tăng dần và username tăng dần; Server trả tối đa 100 người chơi. Thống kê tài khoản và việc ghi bản ghi lịch sử là các thao tác repository riêng; báo cáo không giả định chúng được gộp chung vào một transaction nếu triển khai hiện tại không đảm bảo điều đó.
+Truy vấn ranking sắp xếp theo điểm xếp hạng giảm dần, wins giảm dần, draws giảm dần, losses tăng dần và username tăng dần; Server trả tối đa 100 người chơi. Tài khoản chưa chơi có thống kê bằng 0 nhờ LEFT JOIN và COALESCE. Không có thao tác ghi thống kê riêng; nếu transaction lịch sử bị rollback, cả hai người chơi đều không được cộng điểm.
+
+Khi nâng cấp, dừng server và sao lưu database trước khi chạy server/database/migrate_3nf.sql. Migration đối chiếu thống kê và kết quả cũ với lịch sử, dừng nếu có sai lệch; chỉ bỏ cột dư khi đối chiếu thành công. MySQL DDL tự commit nên cần bản sao lưu để khôi phục khi có sự cố.
