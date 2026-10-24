@@ -21,7 +21,7 @@ public final class GameStateManager implements RoomManager.GameListener {
     private static final int START_HP = 100;
     private static final int START_AMMO = 50;
     private static final int MOVE_STEP = 24;
-    private static final int BULLET_STEP = 12;
+    private static final int BULLET_STEP = 20;
     private static final int HIT_DAMAGE = 20;
     private static final long SHOT_COOLDOWN_NANOS = TimeUnit.MILLISECONDS.toNanos(350);
 

@@ -88,8 +88,27 @@ public final class ChallengeManager {
                 close(invitation, "Một người chơi đã mất kết nối.", true);
                 return;
             }
-            close(invitation, "ACCEPTED", false);
-            rooms.createRoom(invitation.sender, invitation.receiver);
+            // Clean up challenge before creating room
+            invitations.remove(invitation.id);
+            invitationByPlayer.remove(invitation.sender);
+            invitationByPlayer.remove(invitation.receiver);
+            if (invitation.expiry != null) { invitation.expiry.cancel(false); }
+            
+            // Try to create room
+            try {
+                rooms.createRoom(invitation.sender, invitation.receiver);
+                // Only send CHALLENGE_CLOSED after room is successfully created
+                sessions.sendTo(invitation.sender, Protocol.CHALLENGE_CLOSED, invitation.id, "ACCEPTED");
+                sessions.sendTo(invitation.receiver, Protocol.CHALLENGE_CLOSED, invitation.id, "ACCEPTED");
+            } catch (Exception exception) {
+                // If room creation fails, release players back to ONLINE
+                System.err.println("Không thể tạo phòng đấu: " + exception.getMessage());
+                sessions.sendTo(invitation.sender, Protocol.CHALLENGE_CLOSED, invitation.id, 
+                        "Không thể tạo phòng đấu: " + exception.getMessage());
+                sessions.sendTo(invitation.receiver, Protocol.CHALLENGE_CLOSED, invitation.id, 
+                        "Không thể tạo phòng đấu: " + exception.getMessage());
+                sessions.setStatuses(PlayerStatus.ONLINE, invitation.sender, invitation.receiver);
+            }
         }
     }
 

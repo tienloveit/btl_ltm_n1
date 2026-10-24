@@ -42,6 +42,8 @@ public final class PlayerSessionManager {
             try {
                 recipient.sendPlayerList(players);
             } catch (IOException exception) {
+                System.err.println("Failed to send player list to " + recipient.getUsername() + 
+                        ": " + exception.getMessage());
                 recipient.close();
             }
         }
@@ -68,6 +70,8 @@ public final class PlayerSessionManager {
             try {
                 handler.send(type, values);
             } catch (IOException exception) {
+                System.err.println("Failed to send " + type + " to " + username + 
+                        ": " + exception.getMessage());
                 handler.close();
             }
         }

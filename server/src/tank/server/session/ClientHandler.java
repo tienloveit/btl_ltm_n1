@@ -31,7 +31,7 @@ public final class ClientHandler implements Runnable {
     private final RoomManager rooms;
     private final GameStateManager games;
     private final MatchHistoryRepository history;
-    private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(256);
+    private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(512);
     private Thread writer;
     private final AtomicBoolean closed = new AtomicBoolean();
     private DataInputStream input;
@@ -292,9 +292,20 @@ public final class ClientHandler implements Runnable {
     }
 
     private void enqueue(OutgoingMessage message) throws IOException {
-        if (closed.get() || output == null || !outgoing.offer(message)) {
+        if (closed.get() || output == null) {
+            throw new IOException("Client đã ngắt kết nối.");
+        }
+        try {
+            if (!outgoing.offer(message, 2, TimeUnit.SECONDS)) {
+                System.err.println("Outgoing queue timeout" + clientLabel() + 
+                        " (queue size: " + outgoing.size() + ")");
+                close();
+                throw new IOException("Client nhận dữ liệu quá chậm.");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
             close();
-            throw new IOException("Client đã ngắt kết nối hoặc nhận dữ liệu quá chậm.");
+            throw new IOException("Bị gián đoạn khi gửi dữ liệu.");
         }
     }
 

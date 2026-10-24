@@ -57,9 +57,11 @@ public final class RoomManager {
             rooms.put(room.info.roomId(), room);
             roomByPlayer.put(player1, room.info.roomId());
             roomByPlayer.put(player2, room.info.roomId());
-            broadcastState(room);
+            // Don't broadcast yet - will be done after ROOM_STATE is sent
             room.countdown = scheduler.scheduleAtFixedRate(
                     () -> tick(room.info.roomId()), 1, 1, TimeUnit.SECONDS);
+            // Send ROOM_STATE first before broadcasting player list
+            broadcastState(room);
             return room.info;
         }
     }
