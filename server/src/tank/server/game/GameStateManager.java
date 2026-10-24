@@ -4,7 +4,7 @@ import tank.server.protocol.Protocol;
 import tank.server.room.RoomManager;
 import tank.server.session.PlayerSessionManager;
 import tank.server.auth.AccountService;
-import tank.server.persistence.MatchHistoryRepository;
+import tank.server.persistence.MatchHistoryWriter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +14,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-/** Authoritative, in-memory match simulation. Clients only submit input and render snapshots. */
+/**
+ * Authoritative simulation. Match mutations share the lobby/session monitor so
+ * tick/input cannot deadlock with room leave/disconnect callbacks (sessions -> match).
+ */
 public final class GameStateManager implements RoomManager.GameListener {
     private static final int FIELD_WIDTH = 800;
     private static final int START_SECONDS = 180;
@@ -36,11 +39,11 @@ public final class GameStateManager implements RoomManager.GameListener {
     private final RoomManager rooms;
     private final ScheduledExecutorService scheduler;
     private final AccountService accounts;
-    private final MatchHistoryRepository history;
+    private final MatchHistoryWriter history;
     private final Map<String, Match> matches = new ConcurrentHashMap<>();
 
     public GameStateManager(PlayerSessionManager sessions, RoomManager rooms,
-                            ScheduledExecutorService scheduler, AccountService accounts, MatchHistoryRepository history) {
+                            ScheduledExecutorService scheduler, AccountService accounts, MatchHistoryWriter history) {
         this.sessions = sessions;
         this.rooms = rooms;
         this.scheduler = scheduler;
@@ -49,17 +52,19 @@ public final class GameStateManager implements RoomManager.GameListener {
     }
 
     @Override public void onMatchStart(RoomManager.RoomInfo room) {
-        Match match = new Match(room);
-        if (matches.putIfAbsent(room.roomId(), match) != null) {
-            throw new IllegalStateException("Phòng đã có trận đấu.");
+        synchronized (sessions) {
+            Match match = new Match(room);
+            if (matches.putIfAbsent(room.roomId(), match) != null) {
+                throw new IllegalStateException("Phòng đã có trận đấu.");
+            }
+            match.task = scheduler.scheduleAtFixedRate(() -> tick(match), 0, 50, TimeUnit.MILLISECONDS);
         }
-        match.task = scheduler.scheduleAtFixedRate(() -> tick(match), 0, 50, TimeUnit.MILLISECONDS);
     }
 
     @Override public void onPlayerLeft(RoomManager.RoomInfo room, String username) {
         Match match = matches.get(room.roomId());
         if (match == null) { return; }
-        synchronized (match) {
+        synchronized (sessions) {
             if (!match.finished) {
                 finish(match, match.other(username).username, username + " đã rời trận.");
             }
@@ -71,9 +76,9 @@ public final class GameStateManager implements RoomManager.GameListener {
     public void move(String username, boolean left) {
         Match match = findPlayerMatch(username);
         if (match == null) { return; }
-        synchronized (match) {
+        synchronized (sessions) {
             Tank tank = match.tankFor(username);
-            if (tank == null || match.finished) { return; }
+            if (tank == null || match.finished || matches.get(match.room.roomId()) != match) { return; }
             tank.x = clamp(tank.x + (left ? -MOVE_STEP : MOVE_STEP), 32, FIELD_WIDTH - 32);
             broadcast(match);
         }
@@ -82,9 +87,10 @@ public final class GameStateManager implements RoomManager.GameListener {
     public void shoot(String username) {
         Match match = findPlayerMatch(username);
         if (match == null) { return; }
-        synchronized (match) {
+        synchronized (sessions) {
             Tank tank = match.tankFor(username);
-            if (tank == null || match.finished || tank.ammo == 0) { return; }
+            if (tank == null || match.finished || tank.ammo == 0
+                    || matches.get(match.room.roomId()) != match) { return; }
             long now = System.nanoTime();
             if (now - tank.lastShot < SHOT_COOLDOWN_NANOS) { return; }
             tank.lastShot = now;
@@ -99,7 +105,7 @@ public final class GameStateManager implements RoomManager.GameListener {
     public void exit(String username) {
         Match match = findPlayerMatch(username);
         if (match == null) { return; }
-        synchronized (match) {
+        synchronized (sessions) {
             if (match.finished) {
                 matches.remove(match.room.roomId(), match);
                 rooms.finishRoom(match.room.roomId(), username + " đã rời phòng.");
@@ -113,8 +119,8 @@ public final class GameStateManager implements RoomManager.GameListener {
     public void playAgain(String username) {
         Match match = findPlayerMatch(username);
         if (match == null) { return; }
-        synchronized (match) {
-            if (!match.finished) { return; }
+        synchronized (sessions) {
+            if (!match.finished || matches.get(match.room.roomId()) != match) { return; }
             if (match.player1.username.equals(username)) { match.player1Ready = true; }
             else { match.player2Ready = true; }
             // Only notify the player who hasn't chosen yet
@@ -138,7 +144,7 @@ public final class GameStateManager implements RoomManager.GameListener {
     }
 
     private void tick(Match match) {
-        synchronized (match) {
+        synchronized (sessions) {
             if (match.finished || matches.get(match.room.roomId()) != match) { return; }
             match.ticks++;
             if (match.ticks % 20 == 0 && --match.seconds <= 0) {
@@ -188,7 +194,7 @@ public final class GameStateManager implements RoomManager.GameListener {
     }
 
     private void finish(Match match, String winner, String reason) {
-        synchronized (match) {
+        synchronized (sessions) {
             if (match.finished) { return; }
             match.finished = true;
             if (match.task != null) { match.task.cancel(false); }

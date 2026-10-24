@@ -1,0 +1,3 @@
+Exception in thread "main" java.lang.IllegalStateException: Set TANK_DB_PASSWORD in server/.env or the server environment.
+	at tank.server.persistence.DatabaseConfig.fromEnvironment(DatabaseConfig.java:34)
+	at tank.server.app.ServerMain.main(ServerMain.java:31)

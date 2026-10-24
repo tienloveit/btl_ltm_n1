@@ -52,6 +52,9 @@ public final class ClientConnection implements AutoCloseable {
     private Socket socket;
     private DataInputStream input;
     private DataOutputStream output;
+    // Only the reader uses this one-token lookahead for the original four-field ROOM_STATE.
+    private String pendingMessageType;
+    private volatile boolean legacyRoomState;
 
     public ClientConnection(Listener listener) {
         this.listener = listener;
@@ -85,7 +88,12 @@ public final class ClientConnection implements AutoCloseable {
     public synchronized void rejectChallenge(String id) throws IOException { send(Protocol.REJECT, id); }
     public synchronized void cancelChallenge(String id) throws IOException { send(Protocol.CHALLENGE_CANCEL, id); }
     public synchronized void leaveRoom(String id) throws IOException { send(Protocol.ROOM_LEAVE, id); }
-    public synchronized void readyRoom(String id) throws IOException { send(Protocol.ROOM_READY, id); }
+    public synchronized void readyRoom(String id) throws IOException {
+        if (legacyRoomState) {
+            throw new IOException("Server cũ chưa hỗ trợ Sẵn sàng. Trận sẽ tự bắt đầu khi hết đếm ngược.");
+        }
+        send(Protocol.ROOM_READY, id);
+    }
     public synchronized void moveLeft() throws IOException { send(Protocol.MOVE_LEFT); }
     public synchronized void moveRight() throws IOException { send(Protocol.MOVE_RIGHT); }
     public synchronized void shoot() throws IOException { send(Protocol.SHOOT); }
@@ -112,7 +120,9 @@ public final class ClientConnection implements AutoCloseable {
         String closeMessage = "Mất kết nối tới server.";
         try {
             while (!closed.get()) {
-                String messageType = input.readUTF();
+                String messageType = pendingMessageType;
+                pendingMessageType = null;
+                if (messageType == null) { messageType = input.readUTF(); }
                 if (Protocol.LOGIN_SUCCESS.equals(messageType)) {
                     listener.onLoginSuccess(readProfile());
                 } else if (Protocol.LOGIN_FAIL.equals(messageType)) {
@@ -137,8 +147,7 @@ public final class ClientConnection implements AutoCloseable {
                 } else if (Protocol.CHALLENGE_CLOSED.equals(messageType)) {
                     listener.onChallengeClosed(input.readUTF(), input.readUTF());
                 } else if (Protocol.ROOM_STATE.equals(messageType)) {
-                    listener.onRoomState(new RoomState(input.readUTF(), input.readUTF(), input.readUTF(), readInt(),
-                            readBoolean(), readBoolean()));
+                    listener.onRoomState(readRoomState());
                 } else if (Protocol.ROOM_CLOSED.equals(messageType)) {
                     listener.onRoomClosed(input.readUTF(), input.readUTF());
                 } else if (Protocol.MATCH_START.equals(messageType)) {
@@ -205,10 +214,48 @@ public final class ClientConnection implements AutoCloseable {
 
     private boolean readBoolean() throws IOException {
         String value = input.readUTF();
+        return parseBoolean(value);
+    }
+
+    private boolean parseBoolean(String value) throws IOException {
         if (!"true".equals(value) && !"false".equals(value)) {
-            throw new IOException("Server gửi trạng thái sẵn sàng không hợp lệ.");
+            throw new IOException("ROOM_STATE: cần true/false nhưng nhận '" + value
+                    + "'. Hãy chạy lại server và client cùng phiên bản.");
         }
         return Boolean.parseBoolean(value);
+    }
+
+    private RoomState readRoomState() throws IOException {
+        String id = input.readUTF();
+        String player1 = input.readUTF();
+        String player2 = input.readUTF();
+        int seconds = readInt();
+        String next = input.readUTF();
+        if (isServerMessageType(next)) {
+            // Old servers omit both ready flags. Preserve the next message header;
+            // never discard bytes or use available(), which depends on TCP packet timing.
+            pendingMessageType = next;
+            legacyRoomState = true;
+            return new RoomState(id, player1, player2, seconds, false, false);
+        }
+        boolean player1Ready = parseBoolean(next);
+        boolean player2Ready = readBoolean();
+        legacyRoomState = false;
+        return new RoomState(id, player1, player2, seconds, player1Ready, player2Ready);
+    }
+
+    private static boolean isServerMessageType(String value) {
+        return switch (value) {
+            case Protocol.LOGIN_SUCCESS, Protocol.LOGIN_FAIL, Protocol.REGISTER_SUCCESS,
+                 Protocol.REGISTER_FAIL, Protocol.PLAYER_LIST, Protocol.PROFILE_UPDATE,
+                 Protocol.LOGOUT_SUCCESS, Protocol.SERVER_ERROR, Protocol.CHALLENGE_PENDING,
+                 Protocol.CHALLENGE_RECEIVED, Protocol.CHALLENGE_CLOSED, Protocol.ROOM_STATE,
+                 Protocol.ROOM_CLOSED, Protocol.MATCH_START, Protocol.GAME_STATE, Protocol.GAME_OVER,
+                 Protocol.MATCH_RESULT, Protocol.HIT_EFFECT, Protocol.RANKING_RESPONSE,
+                 Protocol.HISTORY_RESPONSE, Protocol.PLAYER_DETAILS_RESPONSE,
+                 Protocol.PLAYER_DETAILS_ERROR, Protocol.LOBBY_ERROR -> true;
+            default -> false;
+        };
     }
 
     private long readLong() throws IOException {

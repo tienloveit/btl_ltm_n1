@@ -30,13 +30,8 @@ public final class ClientHandler implements Runnable {
     private final ChallengeManager challenges;
     private final RoomManager rooms;
     private final GameStateManager games;
-<<<<<<< HEAD
-    private final MatchHistoryRepository history;
-    private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(512);
-=======
     private final MatchHistoryReader history;
-    private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(256);
->>>>>>> b9d4ace684d81781363ed152341731d5b572abd5
+    private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(512);
     private Thread writer;
     private final AtomicBoolean closed = new AtomicBoolean();
     private DataInputStream input;
@@ -344,17 +339,12 @@ public final class ClientHandler implements Runnable {
         if (closed.get() || output == null) {
             throw new IOException("Client đã ngắt kết nối.");
         }
-        try {
-            if (!outgoing.offer(message, 2, TimeUnit.SECONDS)) {
-                System.err.println("Outgoing queue timeout" + clientLabel() + 
-                        " (queue size: " + outgoing.size() + ")");
-                close();
-                throw new IOException("Client nhận dữ liệu quá chậm.");
-            }
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
+        // Called with the shared lobby lock held: never wait on a slow socket here.
+        if (!outgoing.offer(message)) {
+            System.err.println("Outgoing queue full" + clientLabel()
+                    + " (queue size: " + outgoing.size() + ")");
             close();
-            throw new IOException("Bị gián đoạn khi gửi dữ liệu.");
+            throw new IOException("Client nhận dữ liệu quá chậm.");
         }
     }
 

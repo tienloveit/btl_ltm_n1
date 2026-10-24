@@ -5,6 +5,8 @@ import tank.client.model.PlayerDetails;
 import tank.server.persistence.MatchHistoryRecord;
 import tank.client.model.PlayerSummary;
 import tank.client.model.RoomState;
+import tank.client.model.GameState;
+import tank.server.game.GameStateManager;
 import tank.client.network.ClientConnection;
 import tank.server.auth.AccountService;
 import tank.server.lobby.ChallengeManager;
@@ -40,6 +42,8 @@ public final class LobbyIntegrationTest {
     private static int checks;
 
     public static void main(String[] args) throws Exception {
+        checks += RoomStateProtocolTest.run();
+        gameplayRegression();
         checks += tank.server.game.GameGeometryCheck.run();
         try (Fixture server = new Fixture();
                 Probe alice = server.login("alice");
@@ -297,6 +301,64 @@ public final class LobbyIntegrationTest {
         }
     }
 
+    private static void gameplayRegression() throws Exception {
+        try (Fixture server = new Fixture(true);
+             Probe alice = server.login("alice"); Probe bob = server.login("bob")) {
+            String id = invite(alice, bob);
+            bob.connection.acceptChallenge(id);
+            RoomState room = room(alice.await(0, "ROOM"));
+            bob.await(0, "ROOM");
+            alice.connection.readyRoom(room.roomId());
+            bob.connection.readyRoom(room.roomId());
+            alice.await(0, "START");
+            bob.await(0, "START");
+            alice.await(0, "GAME");
+            bob.await(0, "GAME");
+            int mark = alice.mark();
+            alice.connection.moveLeft();
+            alice.await(mark, "GAME", e -> Integer.parseInt(e.values.get(1)) == 376);
+            mark = alice.mark();
+            alice.connection.moveRight();
+            alice.await(mark, "GAME", e -> Integer.parseInt(e.values.get(1)) == 400);
+            for (int hp = 80; hp >= 0; hp -= 20) {
+                int expectedHp = hp;
+                mark = alice.mark();
+                alice.connection.shoot();
+                alice.await(mark, "GAME", e -> Integer.parseInt(e.values.get(2)) == expectedHp);
+                // Impact takes >350ms, so each confirmed hit also clears the shot cooldown.
+            }
+            alice.await(0, "OVER", e -> e.values.get(1).equals("alice"));
+            bob.await(0, "OVER", e -> e.values.get(1).equals("alice"));
+            check(server.recordedMatches.get() == 1, "round result persisted once");
+            int aMark = alice.mark(), bMark = bob.mark();
+            alice.connection.playAgain();
+            bob.connection.playAgain();
+            alice.await(aMark, "START");
+            bob.await(bMark, "START");
+            alice.await(aMark, "GAME", e -> e.values.get(2).equals("100"));
+            // Exercise input/tick concurrently with a disconnect, the old lock inversion.
+            var inputs = Executors.newSingleThreadExecutor();
+            try {
+                var sent = inputs.submit(() -> {
+                    for (int i = 0; i < 60; i++) {
+                        bob.connection.moveLeft();
+                        bob.connection.moveRight();
+                    }
+                    return null;
+                });
+                alice.close();
+                bob.await(bMark, "ROOM_CLOSED");
+                sent.get(5, TimeUnit.SECONDS);
+            } finally { inputs.shutdownNow(); }
+            check(server.recordedMatches.get() == 2, "disconnect result persisted once");
+            check(bob.count(0, "DISCONNECTED") == 0 && bob.count(0, "LOGOUT") == 0,
+                    "surviving player stays logged in across gameplay/rematch/disconnect");
+            int lobbyMark = bob.mark();
+            bob.connection.challenge("nobody");
+            bob.await(lobbyMark, "ERROR");
+        }
+    }
+
     private static String invite(Probe sender, Probe receiver) throws Exception {
         int sent = sender.mark(), got = receiver.mark();
         sender.connection.challenge(receiver.username);
@@ -482,6 +544,14 @@ public final class LobbyIntegrationTest {
             add("START", id, player1, player2);
         }
 
+        @Override public void onGameState(GameState state) {
+            add("GAME", state.roomId(), "" + state.player1().x(), "" + state.player2().hp());
+        }
+
+        @Override public void onGameOver(String id, String winner, String reason) {
+            add("OVER", id, winner, reason);
+        }
+
         @Override
         public void onLobbyError(String reason) {
             add("ERROR", reason);
@@ -536,9 +606,17 @@ public final class LobbyIntegrationTest {
         final ExecutorService workers = Executors.newCachedThreadPool();
         final List<Socket> sockets = new CopyOnWriteArrayList<>();
         final AtomicInteger starts = new AtomicInteger(), leaves = new AtomicInteger();
+        final AtomicInteger recordedMatches = new AtomicInteger();
+        final GameStateManager games;
         volatile boolean failHistory;
 
         Fixture() throws Exception {
+            this(false);
+        }
+
+        Fixture(boolean gameplay) throws Exception {
+            games = gameplay ? new GameStateManager(sessions, rooms, clock, accounts,
+                    (p1, s1, p2, s2, winner) -> recordedMatches.incrementAndGet()) : null;
             clock.setRemoveOnCancelPolicy(true);
             sessions.setDisconnectListener(challenges::onDisconnect);
             rooms.setGameListener(new RoomManager.GameListener() {
@@ -552,6 +630,7 @@ public final class LobbyIntegrationTest {
                     leaves.incrementAndGet();
                 }
             });
+            if (games != null) { rooms.setGameListener(games); }
             for (String name : List.of("alice", "bob", "carol", "offline_user")) {
                 check(accounts.register(name, name + "@example.test", PASSWORD.toCharArray()) == null, "seed account");
             }
@@ -560,7 +639,7 @@ public final class LobbyIntegrationTest {
                     while (!listener.isClosed()) {
                         Socket socket = listener.accept();
                         sockets.add(socket);
-                        workers.execute(new ClientHandler(socket, accounts, sessions, challenges, rooms, null,
+                        workers.execute(new ClientHandler(socket, accounts, sessions, challenges, rooms, games,
                                 (username, limit) -> {
                                     if (failHistory) { throw new java.sql.SQLException("simulated query error"); }
                                     if (limit != 100) { throw new AssertionError("history must be bounded to 100"); }

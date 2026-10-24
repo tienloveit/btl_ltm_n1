@@ -1,0 +1,81 @@
+Game bắn xe tăng 2 người đối kháng online
+Giới thiệu game và luật chơi
+Hệ thống gồm một Server và nhiều Client. Server chịu trách nhiệm quản lý người chơi, trạng thái trận đấu, vị trí xe tăng, đạn và kết quả của các trận đấu.
+Để chơi, người chơi đăng nhập vào tài khoản của mình trên máy Client. Sau khi đăng nhập thành công, giao diện hiển thị danh sách những người chơi đang online cùng thông tin: tên người chơi, tổng số điểm và trạng thái (đang chờ, đang chơi hoặc rời khỏi), nút xem lịch sử đấu của bản thân và nút xem bảng xếp hạng.
+Người chơi muốn thách đấu sẽ click vào tên của một người chơi đang online trong danh sách.
+Khi nhận được lời mời thách đấu, người chơi được mời có thể chấp nhận (OK) hoặc từ chối (Reject).
+Khi người chơi chấp nhận, Server tạo một phòng đấu và đưa 2 người chơi vào cùng một trận đấu. Mỗi người điều khiển một xe tăng ở một phía của màn hình. Hai xe tăng di chuyển song song theo phương ngang và có thể di chuyển sang trái hoặc phải để né đạn.
+Giao diện trận đấu gồm:
+Xe tăng của người chơi 1 ở phía dưới màn hình.
+Xe tăng của người chơi 2 ở phía trên màn hình.
+Khu vực chiến đấu ở giữa.
+Thanh hiển thị  HP, số đạn, điểm số và thời gian trận đấu, cả 2 đều nhìn thấy.
+Người chơi sử dụng phím mũi tên trái (←) và phải (→) để điều khiển xe tăng di chuyển sang trái hoặc phải. Xe tăng không được di chuyển ra ngoài phạm vi màn hình. Mỗi người chơi ban đầu có 100 HP, 50 viên đạn, thời gian trận đấu là 3 phút.
+Người chơi sử dụng phím Space để bắn. Mỗi lần nhấn phím Space, xe tăng sẽ bắn một viên đạn theo hướng thẳng về vị trí đối diện bên kia. Người chơi phải canh thời điểm bắn và di chuyển để né đạn của đối phương.
+Mỗi người chơi chỉ được phép có một số lượng đạn nhất định trên màn hình tại cùng một thời điểm hoặc phải chờ một khoảng thời gian ngắn giữa hai lần bắn để tránh việc bắn liên tục.
+Khi viên đạn của người chơi va chạm với xe tăng đối phương, xe tăng bị trừ 20 HP. Server chịu trách nhiệm kiểm tra va chạm và cập nhật HP cho cả hai Client.
+Khi HP của một xe tăng giảm về 0, Server kiểm tra trạng thái của cả hai người chơi:
+Nếu chỉ một xe tăng hết máu, người chơi còn lại là người chiến thắng.
+Nếu hết đạn hoặc hết giờ, ai nhiều máu hơn sẽ thắng, bằng máu thì hoà.
+Khi trận đấu kết thúc, Server gửi kết quả cho cả hai người chơi và cập nhật điểm số, số trận thắng/thua hoặc số trận hòa:
+Người thắng được cộng 3 điểm và tăng số trận thắng.
+Người thua không được cộng điểm
+Nếu trận đấu hòa, cả hai người chơi được tăng số trận hòa và điểm số mỗi người được cộng 1 điểm 
+Sau mỗi trận đấu, Server hiển thị thông báo cho cả hai người chơi:
+Chơi tiếp (Play Again).
+Thoát (Exit).
+Nếu cả hai người cùng chọn chơi tiếp, Server tạo một ván đấu mới. Nếu một trong hai người chọn thoát, trận đấu kết thúc và người chơi được đưa trở lại danh sách online.
+Trong khi đang đấu, người chơi có thể nhấn Thoát (Exit) để rời khỏi trận đấu. Server sẽ thông báo cho đối thủ và xử lý người rời trận là người thua. Server lưu trữ tài khoản, điểm số, số trận thắng/thua/hòa và lịch sử các trận đấu. Người chơi có thể xem bảng xếp hạng những người chơi trong hệ thống.
+Bảng xếp hạng được sắp xếp theo các tiêu chí:
+Tổng số điểm giảm dần.
+Tổng số trận thắng giảm dần.
+Tổng số trận hoà giảm dần.
+Tổng số trận thua tăng dần.
+Nếu các chỉ số bằng nhau thì có thể sắp xếp tiếp theo tên người chơi.
+Do đây là game đối kháng online, Server là thành phần trung tâm chịu trách nhiệm đồng bộ trạng thái của hai xe tăng, vị trí đạn, số đạn, trạng thái HP và kết quả trận đấu để đảm bảo hai Client nhìn thấy trạng thái trận đấu giống nhau.
+II. Phân công nhiệm vụ
+Người 1 — Authentication & Player
+Client–Server kết nối và xử lý Login.
+Quản lý tài khoản người chơi.
+Quản lý trạng thái Online/Playing/Offline.
+Giao diện đăng nhập, đăng ký.
+Giao diện thông tin người chơi.
+Giao diện danh sách người chơi Online.
+Xử lý Logout/Disconnect.
+Người 2 — Lobby & Challenge
+Xử lý danh sách người chơi trên Server.
+Xử lý gửi lời mời thách đấu.
+Xử lý Accept/Reject.
+Tạo và quản lý phòng đấu.
+Xử lý trạng thái chờ trận đấu.
+Giao diện Lobby.
+Giao diện Challenge/Accept/Reject.
+Giao diện phòng đấu/chờ đối thủ.
+Người 3 — Gameplay & Game UI
+Xây dựng Tank và Bullet.
+Xử lý di chuyển và bắn.
+Xử lý HP, Ammo và Timer.
+Xử lý Collision.
+Xử lý Game Loop và đồng bộ trạng thái.
+Xử lý thắng/thua/hòa.
+Giao diện Game.
+Vẽ Tank, Bullet, map.
+Hiển thị HP, Ammo, Score, Time.
+Xử lý phím ← → và Space.
+Người 4 — Result, Ranking & History
+Xử lý kết thúc trận đấu.
+Cập nhật điểm và thống kê thắng/thua/hòa.
+Lưu lịch sử trận đấu.
+Xử lý Play Again/Exit.
+Xây dựng Ranking và History.
+Giao diện Game Over.
+Giao diện Ranking.
+Giao diện History.
+Xử lý dữ liệu Database/JDBC liên quan đến kết quả.
+Phần cả nhóm
+Thiết kế Protocol Message/MessageType.
+Thiết kế model dùng chung.
+Tích hợp Client–Server.
+Test nhiều Client cùng lúc.
+Debug và hoàn thiện game.
+

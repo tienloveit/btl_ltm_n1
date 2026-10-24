@@ -26,6 +26,8 @@
 
 ## Trạng thái và xử lý
 
+Client hỗ trợ cả `ROOM_STATE` hiện tại (6 trường) và định dạng cũ (4 trường, thiếu hai cờ sẵn sàng). Với server cũ, client giữ lại header message kế tiếp thay vì đọc nhầm thành boolean; hai cờ mặc định `false`. Snapshot cũ được hiển thị khi header tiếp theo đến (thường ở tick kế tiếp). `ROOM_READY` không được gửi đến server cũ; trận vẫn bắt đầu theo countdown của server. Boolean sai trong định dạng 6 trường vẫn bị từ chối. Nên khởi động lại cả client và server sau khi build để dùng đầy đủ tính năng Sẵn sàng.
+
 | Trạng thái Server | Hiển thị | Có thể thách đấu |
 |---|---|---|
 | `ONLINE` | Đang chờ | Có |
