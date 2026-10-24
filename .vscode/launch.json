@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run Tank Server",
+            "request": "launch",
+            "mainClass": "tank.server.app.ServerMain",
+            "projectName": "BTL_LTM-server",
+            "cwd": "${workspaceFolder}/server",
+            "console": "integratedTerminal",
+            "classPaths": [
+                "${workspaceFolder}/server/out",
+                "${workspaceFolder}/lib/mysql-connector-j-9.4.0.jar"
+            ],
+            "preLaunchTask": "Build Tank Server"
+        }
+    ]
+}

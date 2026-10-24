@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Tank Server",
+            "type": "process",
+            "command": "powershell.exe",
+            "args": [
+                "-NoProfile",
+                "-Command",
+                "$sources = @(Get-ChildItem -LiteralPath 'src' -Filter '*.java' -Recurse | ForEach-Object { $_.FullName }); & javac --release 17 -encoding UTF-8 -cp '../lib/*' -d out $sources; exit $LASTEXITCODE"
+            ],
+            "options": { "cwd": "${workspaceFolder}/server" },
+            "problemMatcher": "$javac",
+            "group": "build"
+        }
+    ]
+}
