@@ -6,7 +6,7 @@ import tank.server.lobby.ChallengeManager;
 import tank.server.room.RoomManager;
 import tank.server.game.GameStateManager;
 import tank.server.persistence.MatchHistoryRecord;
-import tank.server.persistence.MatchHistoryRepository;
+import tank.server.persistence.MatchHistoryReader;
 import tank.server.persistence.RankingRecord;
 
 import java.io.DataInputStream;
@@ -30,8 +30,13 @@ public final class ClientHandler implements Runnable {
     private final ChallengeManager challenges;
     private final RoomManager rooms;
     private final GameStateManager games;
+<<<<<<< HEAD
     private final MatchHistoryRepository history;
     private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(512);
+=======
+    private final MatchHistoryReader history;
+    private final BlockingQueue<OutgoingMessage> outgoing = new ArrayBlockingQueue<>(256);
+>>>>>>> b9d4ace684d81781363ed152341731d5b572abd5
     private Thread writer;
     private final AtomicBoolean closed = new AtomicBoolean();
     private DataInputStream input;
@@ -56,7 +61,7 @@ public final class ClientHandler implements Runnable {
 
     public ClientHandler(Socket socket, AccountService accountService, PlayerSessionManager sessions,
                          ChallengeManager challenges, RoomManager rooms, GameStateManager games,
-                         MatchHistoryRepository history) {
+                         MatchHistoryReader history) {
         this.socket = socket;
         this.accountService = accountService;
         this.sessions = sessions;
@@ -111,6 +116,9 @@ public final class ClientHandler implements Runnable {
                 } else if (Protocol.ROOM_LEAVE.equals(messageType)) {
                     String id = input.readUTF();
                     if (requireLogin()) { rooms.leave(username, id); }
+                } else if (Protocol.ROOM_READY.equals(messageType)) {
+                    String id = input.readUTF();
+                    if (requireLogin()) { rooms.ready(username, id); }
                 } else if (Protocol.MOVE_LEFT.equals(messageType)) {
                     if (requireLogin() && games != null) { games.move(username, true); }
                 } else if (Protocol.MOVE_RIGHT.equals(messageType)) {
@@ -125,6 +133,11 @@ public final class ClientHandler implements Runnable {
                     if (requireLogin()) { handleRankingRequestSafe(); }
                 } else if (Protocol.HISTORY_REQUEST.equals(messageType)) {
                     if (requireLogin()) { handleHistoryRequestSafe(); }
+                } else if (Protocol.PLAYER_DETAILS_REQUEST.equals(messageType)) {
+                    String target = input.readUTF();
+                    if (username == null) {
+                        send(Protocol.PLAYER_DETAILS_ERROR, target, "Bạn cần đăng nhập trước.");
+                    } else { handlePlayerDetails(target); }
                 } else {
                     send(Protocol.SERVER_ERROR, "Message không được hỗ trợ.");
                 }
@@ -261,6 +274,42 @@ public final class ClientHandler implements Runnable {
             values.add(record.result());
         }
         send(Protocol.HISTORY_RESPONSE, values.toArray(String[]::new));
+    }
+
+    private void handlePlayerDetails(String target) throws IOException {
+        try {
+            AccountService.PublicProfile profile = accountService.findPublicProfile(target);
+            if (profile == null) {
+                send(Protocol.PLAYER_DETAILS_ERROR, target, "Không tìm thấy người chơi.");
+                return;
+            }
+            if (history == null) {
+                send(Protocol.PLAYER_DETAILS_ERROR, target, "Lịch sử đấu chưa được kết nối.");
+                return;
+            }
+            List<MatchHistoryRecord> records = history.listForPlayer(profile.username(), 100);
+            List<String> values = new ArrayList<>();
+            values.add(profile.username());
+            values.add(Integer.toString(profile.matchesPlayed()));
+            values.add(Integer.toString(profile.score()));
+            values.add(Integer.toString(profile.wins()));
+            values.add(Integer.toString(profile.losses()));
+            values.add(Integer.toString(profile.draws()));
+            values.add(sessions.getStatus(profile.username()).name());
+            values.add(Integer.toString(records.size()));
+            for (MatchHistoryRecord record : records) {
+                values.add(Long.toString(record.matchId()));
+                values.add(record.endedAt());
+                values.add(record.opponent());
+                values.add(Integer.toString(record.playerScore()));
+                values.add(Integer.toString(record.opponentScore()));
+                values.add(record.result());
+            }
+            send(Protocol.PLAYER_DETAILS_RESPONSE, values.toArray(String[]::new));
+        } catch (SQLException exception) {
+            System.err.println("Player details query failed" + clientLabel() + ": " + exception.getMessage());
+            send(Protocol.PLAYER_DETAILS_ERROR, target, "Không thể tải hồ sơ và lịch sử đấu. Vui lòng thử lại.");
+        }
     }
 
     void sendPlayerList(List<PlayerSessionManager.PlayerSummary> players) throws IOException {

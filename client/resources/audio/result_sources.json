@@ -1,0 +1,31 @@
+{
+  "source": "user-selected local result recordings",
+  "peak": 0.26,
+  "sample_rate": 44100,
+  "channels": 1,
+  "sample_bits": 16,
+  "effects": {
+    "defeat": {
+      "source_file": "defeat_2s_4s.wav",
+      "original_sha256": "ab215f27f8e683557e7232fb72797590c249646d9779f4f3a146c70612771e5d",
+      "source_seconds": 2.0,
+      "crop_start_seconds": 0.0,
+      "crop_end_seconds": 2.0,
+      "seconds": 2.0,
+      "fade_in_seconds": 0.005,
+      "fade_out_seconds": 0.08,
+      "prepared_sha256": "230ad5e1ddb1e5fc57ccf07b6af484de743faaef519320fda5e74ddcfaa3fa8d"
+    },
+    "victory": {
+      "source_file": "victory_4s_7s.wav",
+      "original_sha256": "32bd055c0c1e860478381027b19fa45c72dd1082c5a05ee4df7640e19955d62d",
+      "source_seconds": 3.0,
+      "crop_start_seconds": 0.0,
+      "crop_end_seconds": 3.0,
+      "seconds": 3.0,
+      "fade_in_seconds": 0.005,
+      "fade_out_seconds": 0.08,
+      "prepared_sha256": "f63e719e03cba76c31327df46064da1c8bdec560ed343ba27f8fddcf3c57e679"
+    }
+  }
+}

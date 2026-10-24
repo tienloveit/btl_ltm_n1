@@ -1,0 +1,23 @@
+{
+  "source": "user-selected local WAV files",
+  "processing": {
+    "peak": 0.85,
+    "loop_overlap_seconds": 0.25
+  },
+  "tracks": {
+    "lobby": {
+      "source_file": "the_mountain-battle-wave-136095_PCM16_mono_44100.wav",
+      "original_sha256": "3a6c37031ff66d7b4e2a4d84f3195a58df9f5f4bd50ab4ae9e0b3fbbf380bfb8",
+      "original_seconds": 112.039,
+      "seconds": 111.789,
+      "prepared_sha256": "8b34ddafab45c399f5db6f5eecb2addbd294cd4aa197630a9d019a4d80623af1"
+    },
+    "battle": {
+      "source_file": "stereo_color-battle-drum-493709_PCM16_mono_44100.wav",
+      "original_sha256": "d85766c1ce2f21340b4d449728fa80988e5f15d8fdaec36a1227fe3d2b906b72",
+      "original_seconds": 65.306,
+      "seconds": 65.056,
+      "prepared_sha256": "a416a7955bad551a669e09ecd1facf04ec277cd5d76ea4dfc89f94def541ee58"
+    }
+  }
+}

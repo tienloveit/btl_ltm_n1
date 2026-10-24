@@ -2,8 +2,10 @@ package tank.client.network;
 
 import tank.client.model.PlayerSummary;
 import tank.client.model.PlayerProfile;
+import tank.client.model.PlayerDetails;
 import tank.client.model.RoomState;
 import tank.client.model.GameState;
+import tank.client.model.MatchResultStats;
 import tank.client.model.RankingEntry;
 import tank.client.model.MatchHistoryEntry;
 import tank.client.protocol.Protocol;
@@ -27,6 +29,8 @@ public final class ClientConnection implements AutoCloseable {
         default void onProfileUpdate(PlayerProfile profile) { }
         default void onRanking(List<RankingEntry> entries) { }
         default void onHistory(List<MatchHistoryEntry> entries) { }
+        default void onPlayerDetails(PlayerDetails details) { }
+        default void onPlayerDetailsError(String username, String message) { }
         void onLogoutSuccess();
         void onDisconnected(String message);
         default void onChallengePending(String id, String opponent, int timeoutSeconds) { }
@@ -37,6 +41,7 @@ public final class ClientConnection implements AutoCloseable {
         default void onMatchStart(String roomId, String player1, String player2) { }
         default void onGameState(GameState state) { }
         default void onGameOver(String roomId, String winner, String reason) { }
+        default void onMatchResult(String roomId, MatchResultStats stats) { }
         default void onHitEffect(String roomId, int x, int y) { }
         default void onLobbyError(String reason) { }
         default void onServerError(String reason) { onLoginFailure(reason); }
@@ -80,6 +85,7 @@ public final class ClientConnection implements AutoCloseable {
     public synchronized void rejectChallenge(String id) throws IOException { send(Protocol.REJECT, id); }
     public synchronized void cancelChallenge(String id) throws IOException { send(Protocol.CHALLENGE_CANCEL, id); }
     public synchronized void leaveRoom(String id) throws IOException { send(Protocol.ROOM_LEAVE, id); }
+    public synchronized void readyRoom(String id) throws IOException { send(Protocol.ROOM_READY, id); }
     public synchronized void moveLeft() throws IOException { send(Protocol.MOVE_LEFT); }
     public synchronized void moveRight() throws IOException { send(Protocol.MOVE_RIGHT); }
     public synchronized void shoot() throws IOException { send(Protocol.SHOOT); }
@@ -87,6 +93,9 @@ public final class ClientConnection implements AutoCloseable {
     public synchronized void playAgain() throws IOException { send(Protocol.PLAY_AGAIN); }
     public synchronized void requestRanking() throws IOException { send(Protocol.RANKING_REQUEST); }
     public synchronized void requestHistory() throws IOException { send(Protocol.HISTORY_REQUEST); }
+    public synchronized void requestPlayerDetails(String username) throws IOException {
+        send(Protocol.PLAYER_DETAILS_REQUEST, username);
+    }
 
     private void send(String messageType, String... values) throws IOException {
         if (closed.get() || output == null) {
@@ -128,7 +137,8 @@ public final class ClientConnection implements AutoCloseable {
                 } else if (Protocol.CHALLENGE_CLOSED.equals(messageType)) {
                     listener.onChallengeClosed(input.readUTF(), input.readUTF());
                 } else if (Protocol.ROOM_STATE.equals(messageType)) {
-                    listener.onRoomState(new RoomState(input.readUTF(), input.readUTF(), input.readUTF(), readInt()));
+                    listener.onRoomState(new RoomState(input.readUTF(), input.readUTF(), input.readUTF(), readInt(),
+                            readBoolean(), readBoolean()));
                 } else if (Protocol.ROOM_CLOSED.equals(messageType)) {
                     listener.onRoomClosed(input.readUTF(), input.readUTF());
                 } else if (Protocol.MATCH_START.equals(messageType)) {
@@ -137,12 +147,18 @@ public final class ClientConnection implements AutoCloseable {
                     listener.onGameState(readGameState());
                 } else if (Protocol.GAME_OVER.equals(messageType)) {
                     listener.onGameOver(input.readUTF(), input.readUTF(), input.readUTF());
+                } else if (Protocol.MATCH_RESULT.equals(messageType)) {
+                    listener.onMatchResult(input.readUTF(), new MatchResultStats(readInt(), readInt(), readInt(), readInt()));
                 } else if (Protocol.HIT_EFFECT.equals(messageType)) {
                     listener.onHitEffect(input.readUTF(), readInt(), readInt());
                 } else if (Protocol.RANKING_RESPONSE.equals(messageType)) {
                     listener.onRanking(readRanking());
                 } else if (Protocol.HISTORY_RESPONSE.equals(messageType)) {
                     listener.onHistory(readHistory());
+                } else if (Protocol.PLAYER_DETAILS_RESPONSE.equals(messageType)) {
+                    listener.onPlayerDetails(new PlayerDetails(readProfile(), readHistory()));
+                } else if (Protocol.PLAYER_DETAILS_ERROR.equals(messageType)) {
+                    listener.onPlayerDetailsError(input.readUTF(), input.readUTF());
                 } else if (Protocol.LOBBY_ERROR.equals(messageType)) {
                     listener.onLobbyError(input.readUTF());
                 } else {
@@ -185,6 +201,14 @@ public final class ClientConnection implements AutoCloseable {
         } catch (NumberFormatException exception) {
             throw new IOException("Server gửi dữ liệu số không hợp lệ.", exception);
         }
+    }
+
+    private boolean readBoolean() throws IOException {
+        String value = input.readUTF();
+        if (!"true".equals(value) && !"false".equals(value)) {
+            throw new IOException("Server gửi trạng thái sẵn sàng không hợp lệ.");
+        }
+        return Boolean.parseBoolean(value);
     }
 
     private long readLong() throws IOException {

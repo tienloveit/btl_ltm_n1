@@ -77,7 +77,7 @@ public final class AccountService {
     public Account recordResult(String username, boolean win, boolean draw) throws SQLException {
         AccountRecord record = repository.findByUsername(username)
                 .orElseThrow(() -> new SQLException("Không tìm thấy tài khoản người chơi."));
-        int score = record.score() + (draw ? 1 : win ? 3 : 0);
+        int score = record.score() + pointsForResult(win, draw);
         int wins = record.wins() + (win ? 1 : 0);
         int losses = record.losses() + (!win && !draw ? 1 : 0);
         int draws = record.draws() + (draw ? 1 : 0);
@@ -88,9 +88,25 @@ public final class AccountService {
         return new Account(record.username(), record.email(), played, score, wins, losses, draws);
     }
 
+    /** Ranking points awarded for a completed match. */
+    public static int pointsForResult(boolean win, boolean draw) {
+        return draw ? 1 : win ? 3 : 0;
+    }
+
     public List<RankingRecord> ranking(int limit) throws SQLException {
         return repository.listRanking(limit);
     }
+
+    public PublicProfile findPublicProfile(String username) throws SQLException {
+        String normalized = username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
+        if (!USERNAME_PATTERN.matcher(normalized).matches()) { return null; }
+        AccountRecord record = repository.findByUsername(normalized).orElse(null);
+        return record == null ? null : new PublicProfile(record.username(), record.matchesPlayed(),
+                record.score(), record.wins(), record.losses(), record.draws());
+    }
+
+    public record PublicProfile(String username, int matchesPlayed, int score,
+                                int wins, int losses, int draws) { }
 
     private static byte[] hash(char[] password, byte[] salt) {
         PBEKeySpec spec = new PBEKeySpec(password, salt, ITERATIONS, KEY_BITS);

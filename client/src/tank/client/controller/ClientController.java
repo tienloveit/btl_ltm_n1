@@ -2,8 +2,10 @@ package tank.client.controller;
 
 import tank.client.model.PlayerSummary;
 import tank.client.model.PlayerProfile;
+import tank.client.model.PlayerDetails;
 import tank.client.model.RoomState;
 import tank.client.model.GameState;
+import tank.client.model.MatchResultStats;
 import tank.client.model.RankingEntry;
 import tank.client.model.MatchHistoryEntry;
 import tank.client.network.ClientConnection;
@@ -127,6 +129,7 @@ public final class ClientController implements ClientConnection.Listener {
     public void rejectChallenge(String id) { sendLobbyAction(client -> client.rejectChallenge(id)); }
     public void cancelChallenge(String id) { sendLobbyAction(client -> client.cancelChallenge(id)); }
     public void leaveRoom(String id) { sendLobbyAction(client -> client.leaveRoom(id)); }
+    public void readyRoom(String id) { sendLobbyAction(client -> client.readyRoom(id)); }
     public void moveLeft() { sendLobbyAction(ClientConnection::moveLeft); }
     public void moveRight() { sendLobbyAction(ClientConnection::moveRight); }
     public void shoot() { sendLobbyAction(ClientConnection::shoot); }
@@ -134,6 +137,24 @@ public final class ClientController implements ClientConnection.Listener {
     public void playAgain() { sendLobbyAction(ClientConnection::playAgain); }
     public void requestRanking() { sendLobbyAction(ClientConnection::requestRanking); }
     public void requestHistory() { sendLobbyAction(ClientConnection::requestHistory); }
+
+    public void requestPlayerDetails(String username) {
+        ClientConnection current = connection;
+        requests.execute(() -> {
+            try {
+                if (current == null) { throw new IOException("Chưa kết nối tới Server."); }
+                current.requestPlayerDetails(username);
+            } catch (IOException exception) { onPlayerDetailsError(username, exception.getMessage()); }
+        });
+    }
+
+    @Override public void onPlayerDetails(PlayerDetails details) {
+        withPlayerFrame(frame -> frame.showPlayerDetails(details));
+    }
+
+    @Override public void onPlayerDetailsError(String username, String reason) {
+        withPlayerFrame(frame -> frame.showPlayerDetailsError(username, reason));
+    }
 
     private void sendLobbyAction(ConnectionAction action) {
         ClientConnection current = connection;
@@ -152,6 +173,7 @@ public final class ClientController implements ClientConnection.Listener {
                 loginFrame.dispose();
                 loginFrame = null;
             }
+            if (playerFrame != null) { playerFrame.dispose(); }
             playerFrame = new PlayerFrame(this, profile);
             playerFrame.setNavigationHandlers(rankingHandler, historyHandler);
             playerFrame.setVisible(true);
@@ -241,6 +263,10 @@ public final class ClientController implements ClientConnection.Listener {
 
     @Override public void onGameOver(String roomId, String winner, String reason) {
         withPlayerFrame(frame -> frame.showGameOver(roomId, winner, reason));
+    }
+
+    @Override public void onMatchResult(String roomId, MatchResultStats stats) {
+        withPlayerFrame(frame -> frame.updateMatchResult(roomId, stats));
     }
 
     @Override public void onHitEffect(String roomId, int x, int y) {

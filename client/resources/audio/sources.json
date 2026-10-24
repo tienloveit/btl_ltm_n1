@@ -1,0 +1,26 @@
+{
+  "source": "user-selected local WAV files",
+  "peak": 0.26,
+  "effects": {
+    "shot": {
+      "source_file": "127845__garyq__tank-fire-mixed.wav",
+      "original_sha256": "9834ba85d7d55c02d153cafe4184949cc4b8b257ab9299943c506d22eb2add1d",
+      "source_channels": 2,
+      "crop_start_seconds": 0.0,
+      "seconds": 0.55,
+      "fade_in_seconds": 0.002,
+      "fade_out_seconds": 0.06,
+      "prepared_sha256": "ec4d6b251456187a1a654bd33c25733a37b1d8f7d95fa8c5fb6e803f8768ee01"
+    },
+    "explosion": {
+      "source_file": "523365__lilmati__bomb-explosion.wav",
+      "original_sha256": "74747555adebb63dd98f672404baf1b9a806750da3daec23536f80d6b6c91123",
+      "source_channels": 2,
+      "crop_start_seconds": 0.78,
+      "seconds": 0.9,
+      "fade_in_seconds": 0.005,
+      "fade_out_seconds": 0.12,
+      "prepared_sha256": "cab782155667288c7bf41d15b6c63d4ff40748f3d06915cc060b7514e36e81bd"
+    }
+  }
+}

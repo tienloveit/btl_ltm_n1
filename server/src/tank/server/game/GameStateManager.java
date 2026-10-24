@@ -23,6 +23,13 @@ public final class GameStateManager implements RoomManager.GameListener {
     private static final int MOVE_STEP = 24;
     private static final int BULLET_STEP = 20;
     private static final int HIT_DAMAGE = 20;
+    private static final int BOTTOM_TANK_Y = 370;
+    private static final int TOP_TANK_Y = 10;
+    // Enclose the visible treads and cannon in one circular, server-authoritative hit area.
+    // Coordinates are scaled around the same tank center used by the client sprite.
+    private static final double TANK_SCALE = 0.765;
+    private static final double TANK_HITBOX_RADIUS = Math.ceil(TANK_SCALE * Math.hypot(40, 35.5));
+    private static final double TANK_CENTER_Y_OFFSET = 20.5;
     private static final long SHOT_COOLDOWN_NANOS = TimeUnit.MILLISECONDS.toNanos(350);
 
     private final PlayerSessionManager sessions;
@@ -82,7 +89,8 @@ public final class GameStateManager implements RoomManager.GameListener {
             if (now - tank.lastShot < SHOT_COOLDOWN_NANOS) { return; }
             tank.lastShot = now;
             tank.ammo--;
-            match.bullets.add(new Bullet(username, tank.x, tank.bottomPlayer ? 350 : 70,
+            match.bullets.add(new Bullet(username, tank.x,
+                    tank.bottomPlayer ? BOTTOM_TANK_Y - 10 : TOP_TANK_Y + 30,
                     tank.bottomPlayer ? -BULLET_STEP : BULLET_STEP));
             broadcast(match);
         }
@@ -169,8 +177,14 @@ public final class GameStateManager implements RoomManager.GameListener {
     }
 
     private static boolean hit(Bullet bullet, Tank tank) {
-        int tankY = tank.bottomPlayer ? 360 : 40;
-        return Math.abs(bullet.x - tank.x) <= 42 && bullet.y >= tankY - 12 && bullet.y <= tankY + 45;
+        return hitsTank(bullet.x, bullet.y, tank.x, tank.bottomPlayer);
+    }
+
+    static boolean hitsTank(int bulletX, int bulletY, int tankX, boolean bottomPlayer) {
+        int tankY = bottomPlayer ? BOTTOM_TANK_Y : TOP_TANK_Y;
+        double dx = bulletX - tankX;
+        double dy = bulletY - (tankY + TANK_CENTER_Y_OFFSET);
+        return dx * dx + dy * dy <= TANK_HITBOX_RADIUS * TANK_HITBOX_RADIUS;
     }
 
     private void finish(Match match, String winner, String reason) {
@@ -179,7 +193,12 @@ public final class GameStateManager implements RoomManager.GameListener {
             match.finished = true;
             if (match.task != null) { match.task.cancel(false); }
             broadcast(match);
-            persistResult(match, winner);
+            MatchResultStats result = persistResult(match, winner);
+            String[] stats = {match.room.roomId(), Integer.toString(result.player1Points()),
+                    Integer.toString(result.player1Total()), Integer.toString(result.player2Points()),
+                    Integer.toString(result.player2Total())};
+            sessions.sendTo(match.player1.username, Protocol.MATCH_RESULT, stats);
+            sessions.sendTo(match.player2.username, Protocol.MATCH_RESULT, stats);
             sessions.sendTo(match.player1.username, Protocol.GAME_OVER, match.room.roomId(), winner, reason);
             sessions.sendTo(match.player2.username, Protocol.GAME_OVER, match.room.roomId(), winner, reason);
         }
@@ -208,18 +227,35 @@ public final class GameStateManager implements RoomManager.GameListener {
         broadcast(match);
     }
 
-    private void persistResult(Match match, String winner) {
+    private MatchResultStats persistResult(Match match, String winner) {
+        boolean draw = "DRAW".equals(winner);
+        int player1Points = AccountService.pointsForResult(winner.equals(match.player1.username), draw);
+        int player2Points = AccountService.pointsForResult(winner.equals(match.player2.username), draw);
+        int player1Total = -1;
+        int player2Total = -1;
         try {
-            boolean draw = "DRAW".equals(winner);
             AccountService.Account p1 = accounts.recordResult(match.player1.username, winner.equals(match.player1.username), draw);
-            AccountService.Account p2 = accounts.recordResult(match.player2.username, winner.equals(match.player2.username), draw);
             sessions.updateStatistics(p1.username(), p1.matchesPlayed(), p1.score(), p1.wins(), p1.losses(), p1.draws());
+            player1Total = p1.score();
+        } catch (java.sql.SQLException exception) {
+            System.err.println("Không lưu được thống kê trận đấu cho " + match.player1.username + ": " + exception.getMessage());
+        }
+        try {
+            AccountService.Account p2 = accounts.recordResult(match.player2.username, winner.equals(match.player2.username), draw);
             sessions.updateStatistics(p2.username(), p2.matchesPlayed(), p2.score(), p2.wins(), p2.losses(), p2.draws());
+            player2Total = p2.score();
+        } catch (java.sql.SQLException exception) {
+            System.err.println("Không lưu được thống kê trận đấu cho " + match.player2.username + ": " + exception.getMessage());
+        }
+        try {
             history.record(match.player1.username, match.player1.score, match.player2.username, match.player2.score, winner);
         } catch (java.sql.SQLException exception) {
-            System.err.println("Không lưu được kết quả trận đấu: " + exception.getMessage());
+            System.err.println("Không lưu được lịch sử trận đấu: " + exception.getMessage());
         }
+        return new MatchResultStats(player1Points, player1Total, player2Points, player2Total);
     }
+
+    private record MatchResultStats(int player1Points, int player1Total, int player2Points, int player2Total) { }
 
     private void broadcast(Match match) {
         List<String> values = new ArrayList<>();

@@ -33,65 +33,52 @@ public final class OnlinePlayersPanel extends JPanel {
             return column == 3 && canChallenge(row);
         }
     };
-    private final JTable table = new JTable(model);
+    private final JTable table = new HomeTable(model, "Chưa có đối thủ online",
+            "Người chơi mới sẽ xuất hiện tại đây.");
+    private final ChallengeRenderer challengeRenderer = new ChallengeRenderer();
+    private final ChallengeEditor challengeEditor = new ChallengeEditor();
 
     public OnlinePlayersPanel(String ownUsername, Consumer<String> onChallenge) {
-        super(new BorderLayout(0, 16));
+        this(ownUsername, onChallenge, username -> { });
+    }
+
+    public OnlinePlayersPanel(String ownUsername, Consumer<String> onChallenge, Consumer<String> onDetails) {
+        super(new BorderLayout(0, 8));
         this.ownUsername = ownUsername;
         this.onChallenge = onChallenge;
         setOpaque(false);
-        setBorder(BorderFactory.createEmptyBorder(20, 22, 22, 22));
-        JPanel title = new JPanel(new BorderLayout());
-        title.setOpaque(false);
-        JLabel heading = new JLabel("NGƯỜI CHƠI ONLINE");
-        heading.setForeground(GameTheme.TEXT);
-        heading.setFont(heading.getFont().deriveFont(Font.BOLD, 17f));
-        countLabel.setForeground(GameTheme.ACCENT);
-        title.add(heading, BorderLayout.WEST);
-        title.add(countLabel, BorderLayout.EAST);
-        add(title, BorderLayout.NORTH);
-        table.setFillsViewportHeight(true);
-        table.setRowHeight(48);
-        table.setFont(table.getFont().deriveFont(14f));
-        table.setForeground(GameTheme.TEXT);
-        table.setBackground(GameTheme.SURFACE);
-        table.setSelectionBackground(GameTheme.SURFACE_LIGHT);
-        table.setSelectionForeground(GameTheme.TEXT);
-        table.setGridColor(GameTheme.BORDER);
-        table.setShowVerticalLines(false);
-        table.getTableHeader().setReorderingAllowed(false);
-        table.getTableHeader().setBackground(GameTheme.FIELD);
-        table.getTableHeader().setForeground(GameTheme.MUTED);
-        table.getTableHeader().setFont(table.getFont().deriveFont(Font.BOLD, 12f));
-        table.getTableHeader().setPreferredSize(new java.awt.Dimension(0, 42));
+        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        countLabel.setForeground(HomeTheme.MUTED);
+        countLabel.setFont(countLabel.getFont().deriveFont(Font.BOLD, 14f));
+        countLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+        add(countLabel, BorderLayout.SOUTH);
+        HomeTheme.table(table);
+        table.setRowHeight(54);
+        table.putClientProperty("home-name-column", 0);
         table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
-        DefaultTableCellRenderer textRenderer = new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(JTable source, Object value,
-                    boolean selected, boolean focused, int row, int column) {
-                super.getTableCellRendererComponent(source, value, selected, focused, row, column);
-                setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 12));
-                setBackground(selected ? GameTheme.SURFACE_LIGHT : row % 2 == 0 ? GameTheme.SURFACE : GameTheme.FIELD);
-                setForeground(column == 2 ? ("ONLINE".equals(players.get(row).getStatus())
-                        ? GameTheme.ACCENT : GameTheme.MUTED) : GameTheme.TEXT);
-                setHorizontalAlignment(column == 1 ? SwingConstants.CENTER : SwingConstants.LEFT);
-                return this;
-            }
-        };
-        for (int column = 0; column < 3; column++) {
-            table.getColumnModel().getColumn(column).setCellRenderer(textRenderer);
-        }
+        table.getColumnModel().getColumn(2).setCellRenderer(new HomeTheme.BadgeCell());
         table.getColumnModel().getColumn(0).setPreferredWidth(190);
         table.getColumnModel().getColumn(1).setPreferredWidth(70);
         table.getColumnModel().getColumn(2).setPreferredWidth(145);
         table.getColumnModel().getColumn(3).setPreferredWidth(145);
-        table.getColumnModel().getColumn(3).setCellRenderer(new ChallengeRenderer());
-        table.getColumnModel().getColumn(3).setCellEditor(new ChallengeEditor());
+        table.getColumnModel().getColumn(3).setCellRenderer(challengeRenderer);
+        table.getColumnModel().getColumn(3).setCellEditor(challengeEditor);
         JScrollPane scroll = new JScrollPane(table);
         scroll.setColumnHeaderView(table.getTableHeader());
-        scroll.setBorder(BorderFactory.createLineBorder(GameTheme.BORDER));
-        scroll.getViewport().setBackground(GameTheme.SURFACE);
+        HomeTheme.scroll(scroll);
         add(scroll, BorderLayout.CENTER);
         countLabel.setText("0 đối thủ");
+        PlayerTableActions.install(table, 0, 3, onDetails);
+        ((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer())
+                .setHorizontalAlignment(SwingConstants.CENTER);
+    }
+
+    void applyUiScale(float scale) {
+        table.setRowHeight(Math.max(44, Math.round(54 * scale)));
+        table.getColumnModel().getColumn(0).setPreferredWidth(Math.round(190 * scale));
+        table.getColumnModel().getColumn(1).setPreferredWidth(Math.round(70 * scale));
+        table.getColumnModel().getColumn(2).setPreferredWidth(Math.round(145 * scale));
+        table.getColumnModel().getColumn(3).setPreferredWidth(Math.round(145 * scale));
     }
 
     public void setPlayers(List<PlayerSummary> roster) {
@@ -128,21 +115,50 @@ public final class OnlinePlayersPanel extends JPanel {
                 && "ONLINE".equals(players.get(row).getStatus());
     }
 
+    private JPanel challengeCell(JButton button) {
+        HomeTheme.button(button, null);
+        button.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
+        JPanel cell = new JPanel(null) {
+            @Override public void doLayout() {
+                float scale = table.getFont().getSize2D() / 15f;
+                int w = Math.min(getWidth() - 16, Math.round(116 * scale));
+                int h = Math.min(getHeight() - 12, Math.round(34 * scale));
+                button.setBounds((getWidth() - w) / 2, (getHeight() - h) / 2,
+                        Math.max(0, w), Math.max(0, h));
+            }
+        };
+        cell.add(button);
+        return cell;
+    }
+
+    private void configureChallengeCell(JPanel cell, JButton button, JTable source, int row, boolean selected) {
+        cell.setBackground(HomeTheme.rowColor(source, row, selected));
+        button.setFont(source.getFont().deriveFont(Font.BOLD, source.getFont().getSize2D() * .87f));
+        cell.setSize(source.getColumnModel().getColumn(3).getWidth(), source.getRowHeight());
+        cell.doLayout();
+    }
+
     private final class ChallengeRenderer implements TableCellRenderer {
         private final JButton button = GameTheme.button("Thách đấu", true);
+        private final JPanel cell = challengeCell(button);
         @Override public Component getTableCellRendererComponent(JTable source, Object value,
                 boolean selected, boolean focused, int row, int column) {
-            button.setEnabled(canChallenge(row));
-            button.setText("ONLINE".equals(players.get(row).getStatus()) ? "Thách đấu" : "Đang bận");
-            return button;
+            int modelRow = source.convertRowIndexToModel(row);
+            configureChallengeCell(cell, button, source, row, selected);
+            button.setEnabled(canChallenge(modelRow));
+            button.setText("ONLINE".equals(players.get(modelRow).getStatus()) ? "Thách đấu" : "Đang bận");
+            return cell;
         }
     }
 
     private final class ChallengeEditor extends AbstractCellEditor implements TableCellEditor {
         private final JButton button = GameTheme.button("Thách đấu", true);
+        private final JPanel cell = challengeCell(button);
         private String target;
         ChallengeEditor() {
             button.addActionListener(event -> {
+                if (requesting || target == null) { return; }
+                button.setEnabled(false);
                 String selected = target;
                 fireEditingStopped();
                 setRequesting(true);
@@ -151,8 +167,10 @@ public final class OnlinePlayersPanel extends JPanel {
         }
         @Override public Component getTableCellEditorComponent(JTable source, Object value,
                 boolean selected, int row, int column) {
-            target = players.get(row).getUsername();
-            return button;
+            target = players.get(source.convertRowIndexToModel(row)).getUsername();
+            configureChallengeCell(cell, button, source, row, selected);
+            button.setEnabled(canChallenge(source.convertRowIndexToModel(row)));
+            return cell;
         }
         @Override public Object getCellEditorValue() { return ""; }
     }
